@@ -1,6 +1,89 @@
-import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
+import { BrowserRouter, NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
+
+
+function TabIconBase({ children }) {
+  return (
+    <span
+      style={{
+        width: 24,
+        height: 24,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <TabIconBase>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M3 10.5 12 3l9 7.5" />
+        <path d="M5.5 9.5V20h13V9.5" />
+        <path d="M10 20v-5h4v5" />
+      </svg>
+    </TabIconBase>
+  );
+}
+
+function SprayIcon() {
+  return (
+    <TabIconBase>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 9h6l2 2v8a2 2 0 0 1-2 2h-4a4 4 0 0 1-4-4V11a2 2 0 0 1 2-2Z" />
+        <path d="M11 9V6.5A1.5 1.5 0 0 1 12.5 5h2A1.5 1.5 0 0 1 16 6.5V8" />
+        <path d="M8 12h6" />
+        <path d="M17.5 8.5h2" />
+        <path d="M18.5 6.5v1" />
+        <path d="M20.5 7.5v1" />
+      </svg>
+    </TabIconBase>
+  );
+}
+
+function UsersIcon() {
+  return (
+    <TabIconBase>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3.5 18a5.5 5.5 0 0 1 11 0" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M14.5 18a4.5 4.5 0 0 1 6 0" />
+      </svg>
+    </TabIconBase>
+  );
+}
+
+function CarIcon() {
+  return (
+    <TabIconBase>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M5 16 6.5 11.5A2 2 0 0 1 8.4 10H15.6a2 2 0 0 1 1.9 1.5L19 16" />
+        <path d="M4 16h16v3a1 1 0 0 1-1 1h-1v-2H6v2H5a1 1 0 0 1-1-1v-3Z" />
+        <circle cx="7.5" cy="16.5" r="1" fill="currentColor" stroke="none" />
+        <circle cx="16.5" cy="16.5" r="1" fill="currentColor" stroke="none" />
+      </svg>
+    </TabIconBase>
+  );
+}
+
+function FileIcon() {
+  return (
+    <TabIconBase>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 3h6l5 5v13H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" />
+        <path d="M14 3v5h5" />
+        <path d="M9.5 13h5" />
+        <path d="M9.5 17h5" />
+      </svg>
+    </TabIconBase>
+  );
+}
 
 function getDateRange(type, month, year) {
   const today = new Date();
@@ -96,27 +179,11 @@ function buildBusinessSignature(settings) {
 
 function openMailto(to, subject, body) {
   if (!to) return false;
-
   const mailto = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(
     subject
   )}&body=${encodeURIComponent(body)}`;
-
-  try {
-    const link = document.createElement("a");
-    link.href = mailto;
-    link.style.display = "none";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    return true;
-  } catch (error) {
-    try {
-      window.location.href = mailto;
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  window.location.href = mailto;
+  return true;
 }
 
 function buildJobInvoiceEmail(job, settings) {
@@ -1102,7 +1169,7 @@ function JobsPage() {
       return;
     }
     setInvoicePreviewJob(selectedJob);
-    setMessage("Invoice print preview opened. Use Print / Save PDF at the top.");
+    setMessage("Invoice print preview opened.");
   }
 
   function handleEmailInvoice() {
@@ -1118,7 +1185,7 @@ function JobsPage() {
     }
 
     openMailto(email.to, email.subject, email.body);
-    setMessage("Invoice email draft was requested from your device email app.");
+    setMessage("Invoice email draft opened in your email app.");
   }
 
   const filteredJobs = jobs.filter((job) => {
@@ -1421,19 +1488,24 @@ function JobsPage() {
             onToggle={() => setShowActionSection((v) => !v)}
           >
             {selectedJob ? (
-              <div style={compactFormStyle}>
-                <div style={mutedTextCompact}>
-                  Open Invoice goes straight to the invoice viewer. Print and Save PDF happen from the preview screen.
-                </div>
-                <div style={grid2}>
+              <ActionMenu
+                title="Invoice"
+                subtitle="Preview, print, or email this job invoice."
+                isOpen={showInvoiceMenu}
+                onToggle={() => setShowInvoiceMenu((v) => !v)}
+              >
+                <div style={grid3}>
                   <button type="button" onClick={handlePreviewInvoice} style={buttonStyle}>
-                    Open Invoice
+                    Preview
+                  </button>
+                  <button type="button" onClick={handlePreviewInvoice} style={secondaryButtonStyle}>
+                    Print / PDF
                   </button>
                   <button type="button" onClick={handleEmailInvoice} style={secondaryButtonStyle}>
-                    Email Invoice
+                    Email
                   </button>
                 </div>
-              </div>
+              </ActionMenu>
             ) : (
               <div style={mutedText}>No job selected.</div>
             )}
@@ -1558,8 +1630,7 @@ function JobsPage() {
                           type="button"
                           onClick={() => {
                             setSelectedJobId(job.id);
-                            setInvoicePreviewJob(job);
-                            setMessage("Invoice print preview opened.");
+                            setShowInvoiceMenu(true);
                           }}
                           style={miniButtonStyle}
                         >
@@ -1852,6 +1923,68 @@ function MileagePage() {
   );
 }
 
+function DocumentsPage({ onOpenReports, onOpenSettings, onOpenDeleted }) {
+  const navigate = useNavigate();
+
+  return (
+    <div style={{ paddingTop: 10 }}>
+      <div style={cardStyle}>
+        <div style={sectionTitle}>Documents Hub</div>
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={innerCardStyle}>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>Job Invoices</div>
+            <div style={mutedTextCompact}>Open Jobs and select a job to preview, print, or email an invoice.</div>
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => navigate("/jobs")} style={buttonStyle}>
+                Open Jobs
+              </button>
+            </div>
+          </div>
+
+          <div style={innerCardStyle}>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>Client Statements</div>
+            <div style={mutedTextCompact}>Open Clients and select a client to preview, print, or email a statement.</div>
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => navigate("/clients")} style={buttonStyle}>
+                Open Clients
+              </button>
+            </div>
+          </div>
+
+          <div style={innerCardStyle}>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>Monthly Invoices</div>
+            <div style={mutedTextCompact}>Open Clients and use the invoice action for the selected period.</div>
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={() => navigate("/clients")} style={buttonStyle}>
+                Open Clients
+              </button>
+            </div>
+          </div>
+
+          <div style={innerCardStyle}>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>Reports</div>
+            <div style={mutedTextCompact}>Open report preview, print it, or create an email draft from the Reports tab.</div>
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={onOpenReports} style={buttonStyle}>
+                Open Reports
+              </button>
+            </div>
+          </div>
+
+          <div style={grid2}>
+            <button type="button" onClick={onOpenSettings} style={secondaryButtonStyle}>
+              Open Settings
+            </button>
+            <button type="button" onClick={onOpenDeleted} style={secondaryButtonStyle}>
+              Open Deleted
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReportsPage() {
   const [clients, setClients] = useState([]);
   const [jobs, setJobs] = useState([]);
@@ -1977,7 +2110,7 @@ function ReportsPage() {
 
   function handlePreviewReport() {
     setReportPreview(reportData);
-    setActionMessage("Report print preview opened. Use Print / Save PDF at the top.");
+    setActionMessage("Report print preview opened.");
   }
 
   function handleEmailReport() {
@@ -1988,7 +2121,7 @@ function ReportsPage() {
     }
 
     openMailto(email.to, email.subject, email.body);
-    setActionMessage("Report email draft was requested from your device email app.");
+    setActionMessage("Report email draft opened in your email app.");
   }
 
   return (
@@ -2419,7 +2552,7 @@ function ClientsPage() {
 
     setMonthlyInvoicePreview(null);
     setStatementPreview(data);
-    setDocMessage("Statement print preview opened. Use Print / Save PDF at the top.");
+    setDocMessage("Statement print preview opened.");
   }
 
   function buildMonthlyInvoicePreview() {
@@ -2431,7 +2564,7 @@ function ClientsPage() {
 
     setStatementPreview(null);
     setMonthlyInvoicePreview(data);
-    setDocMessage("Monthly invoice print preview opened. Use Print / Save PDF at the top.");
+    setDocMessage("Monthly invoice print preview opened.");
   }
 
   function handleEmailStatement() {
@@ -2448,7 +2581,7 @@ function ClientsPage() {
     }
 
     openMailto(email.to, email.subject, email.body);
-    setDocMessage("Statement email draft was requested from your device email app.");
+    setDocMessage("Statement email draft opened in your email app.");
   }
 
   function handleEmailMonthlyInvoice() {
@@ -2465,7 +2598,7 @@ function ClientsPage() {
     }
 
     openMailto(email.to, email.subject, email.body);
-    setDocMessage("Monthly invoice email draft was requested from your device email app.");
+    setDocMessage("Monthly invoice email draft opened in your email app.");
   }
 
   async function saveClient(e) {
@@ -3018,7 +3151,7 @@ function ClientsPage() {
                               range,
                               totals: sumJobs(clientJobs),
                             });
-                            setDocMessage("Statement print preview opened. Use Print / Save PDF at the top.");
+                            setDocMessage("Statement print preview opened.");
                           }}
                           style={miniButtonStyle}
                         >
@@ -3042,7 +3175,7 @@ function ClientsPage() {
                               range,
                               totals: sumJobs(clientJobs),
                             });
-                            setDocMessage("Monthly invoice print preview opened. Use Print / Save PDF at the top.");
+                            setDocMessage("Monthly invoice print preview opened.");
                           }}
                           style={miniButtonStyle}
                         >
@@ -3776,7 +3909,7 @@ function StatCard({ label, value }) {
 }
 
 function OfficePage() {
-  const [officeTab, setOfficeTab] = useState("reports");
+  const [officeTab, setOfficeTab] = useState("documents");
   const [adminTab, setAdminTab] = useState("settings");
 
   return (
@@ -3787,11 +3920,25 @@ function OfficePage() {
         value={officeTab}
         onChange={setOfficeTab}
         tabs={[
+          { value: "documents", label: "Documents" },
           { value: "reports", label: "Reports" },
           { value: "admin", label: "Admin" },
         ]}
       />
 
+      {officeTab === "documents" ? (
+        <DocumentsPage
+          onOpenReports={() => setOfficeTab("reports")}
+          onOpenSettings={() => {
+            setOfficeTab("admin");
+            setAdminTab("settings");
+          }}
+          onOpenDeleted={() => {
+            setOfficeTab("admin");
+            setAdminTab("deleted");
+          }}
+        />
+      ) : null}
       {officeTab === "reports" ? <ReportsPage /> : null}
 
       {officeTab === "admin" ? (
@@ -3836,16 +3983,20 @@ const mutedText = {
 const mutedTextCompact = {
   color: "#6c6760",
   marginTop: 4,
-  fontSize: 15,
+  fontSize: 14,
 };
 
 const inputStyle = {
   width: "100%",
-  padding: "14px 16px",
+  padding: "12px 14px",
   borderRadius: 12,
   border: "2px solid #d0ccc4",
-  fontSize: 18,
+  fontSize: 16,
   boxSizing: "border-box",
+  background: "#fff",
+  color: "#1e1b18",
+  WebkitTextFillColor: "#1e1b18",
+  appearance: "none",
 };
 
 const buttonStyle = {
@@ -3885,7 +4036,7 @@ const miniButtonStyle = {
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 15,
+  fontSize: 14,
 };
 
 const secondaryMiniButtonStyle = {
@@ -3895,7 +4046,7 @@ const secondaryMiniButtonStyle = {
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 15,
+  fontSize: 14,
 };
 
 const cardStyle = {
@@ -4092,7 +4243,7 @@ const simpleCardSubRowStyle = {
   gap: 12,
   color: "#6c6760",
   marginTop: 8,
-  fontSize: 15,
+  fontSize: 14,
 };
 
 const simpleCardTitleStyle = {
@@ -4305,15 +4456,24 @@ const printPaperWrapStyle = {
 };
 
 function Layout() {
+  const screenWidth = typeof window !== "undefined" ? window.innerWidth : 390;
+  const isPhoneScreen = screenWidth <= 520;
+  const isVeryNarrowPhone = screenWidth <= 420;
+
   const navStyle = ({ isActive }) => ({
-    padding: "14px 18px",
-    borderRadius: 14,
+    padding: isVeryNarrowPhone ? "6px 1px" : isPhoneScreen ? "7px 2px" : "8px 6px",
+    borderRadius: isVeryNarrowPhone ? 8 : isPhoneScreen ? 10 : 12,
     textDecoration: "none",
-    fontWeight: 700,
     color: isActive ? "#fff" : "#1e1b18",
     background: isActive ? "#1e1b18" : "#fff",
-    border: "2px solid #d0ccc4",
+    border: isVeryNarrowPhone ? "1px solid #d0ccc4" : "2px solid #d0ccc4",
     textAlign: "center",
+    minWidth: 0,
+    minHeight: isVeryNarrowPhone ? 32 : isPhoneScreen ? 36 : 42,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    boxSizing: "border-box",
   });
 
   return (
@@ -4322,14 +4482,27 @@ function Layout() {
         minHeight: "100vh",
         background: "#f4f0e8",
         color: "#1e1b18",
-        paddingBottom: 110,
+        paddingBottom: isVeryNarrowPhone ? 52 : isPhoneScreen ? 58 : 72,
       }}
     >
-      <div style={{ padding: 24 }}>
-        <h1 style={{ fontSize: 42, margin: 0, fontWeight: 900 }}>
+      <div style={{ padding: isPhoneScreen ? 16 : 20 }}>
+        <h1
+          style={{
+            fontSize: isVeryNarrowPhone ? 26 : isPhoneScreen ? 28 : 32,
+            margin: 0,
+            fontWeight: 900,
+            color: "#1e1b18",
+          }}
+        >
           Cleaning Tracker
         </h1>
-        <p style={{ fontSize: 22, color: "#6c6760", marginTop: 10 }}>
+        <p
+          style={{
+            fontSize: isVeryNarrowPhone ? 14 : isPhoneScreen ? 15 : 18,
+            color: "#4f4a45",
+            marginTop: 8,
+          }}
+        >
           New shared app version.
         </p>
       </div>
@@ -4349,18 +4522,19 @@ function Layout() {
           right: 0,
           bottom: 0,
           display: "grid",
-          gridTemplateColumns: "repeat(5, 1fr)",
-          gap: 8,
-          padding: 12,
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gap: isVeryNarrowPhone ? 1 : isPhoneScreen ? 2 : 4,
+          padding: isVeryNarrowPhone ? 3 : isPhoneScreen ? 4 : 6,
           background: "#f4f0e8",
-          borderTop: "2px solid #d0ccc4",
+          borderTop: "1px solid #d0ccc4",
+          boxSizing: "border-box",
         }}
       >
-        <NavLink to="/" style={navStyle}>Home</NavLink>
-        <NavLink to="/jobs" style={navStyle}>Jobs</NavLink>
-        <NavLink to="/clients" style={navStyle}>Clients</NavLink>
-        <NavLink to="/mileage" style={navStyle}>Mileage</NavLink>
-        <NavLink to="/office" style={navStyle}>Office</NavLink>
+        <NavLink to="/" style={navStyle} aria-label="Home" title="Home"><HomeIcon /></NavLink>
+        <NavLink to="/jobs" style={navStyle} aria-label="Jobs" title="Jobs"><SprayIcon /></NavLink>
+        <NavLink to="/clients" style={navStyle} aria-label="Clients" title="Clients"><UsersIcon /></NavLink>
+        <NavLink to="/mileage" style={navStyle} aria-label="Mileage" title="Mileage"><CarIcon /></NavLink>
+        <NavLink to="/office" style={navStyle} aria-label="Office" title="Office"><FileIcon /></NavLink>
       </nav>
     </div>
   );
