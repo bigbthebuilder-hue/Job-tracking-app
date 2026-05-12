@@ -2,6 +2,12 @@ import { BrowserRouter, NavLink, Route, Routes, useNavigate } from "react-router
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
 
+const APP_SCREEN_WIDTH = typeof window !== "undefined" ? window.innerWidth : 390;
+const IS_PHONE = APP_SCREEN_WIDTH <= 520;
+const IS_SMALL_PHONE = APP_SCREEN_WIDTH <= 430;
+const IS_TINY_PHONE = APP_SCREEN_WIDTH <= 390;
+
+
 
 function TabIconBase({ children }) {
   return (
@@ -1260,7 +1266,7 @@ function JobsPage() {
         <>
           {editingJobId ? (
             <div style={selectedPanelStyle}>
-              <div>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Editing Job</div>
                 <div style={selectedPanelTitleStyle}>
                   {clientMap[form.client_id]?.name || "Selected client"}
@@ -1459,7 +1465,7 @@ function JobsPage() {
 
           {selectedJob ? (
             <div style={selectedPanelStyle}>
-              <div>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Selected Job</div>
                 <div style={selectedPanelTitleStyle}>
                   {selectedJob.clients?.name || clientMap[selectedJob.client_id]?.name || "Unknown client"}
@@ -2775,7 +2781,7 @@ function ClientsPage() {
         <>
           {editingClientId ? (
             <div style={selectedPanelStyle}>
-              <div>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Editing Client</div>
                 <div style={selectedPanelTitleStyle}>{form.name || "Selected client"}</div>
                 <div style={mutedTextCompact}>{form.invoice_email || "No invoice email"}</div>
@@ -2939,7 +2945,7 @@ function ClientsPage() {
 
           {currentClient ? (
             <div style={selectedPanelStyle}>
-              <div>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Selected Client</div>
                 <div style={selectedPanelTitleStyle}>{currentClient.name}</div>
                 <div style={mutedTextCompact}>
@@ -3960,38 +3966,48 @@ function OfficePage() {
 }
 
 const pageTitle = {
-  fontSize: 32,
+  fontSize: IS_SMALL_PHONE ? 26 : 32,
   marginBottom: 12,
+  lineHeight: 1.1,
 };
 
 const sectionTitle = {
-  fontSize: 24,
+  fontSize: IS_SMALL_PHONE ? 20 : 24,
   fontWeight: 900,
   marginBottom: 12,
+  lineHeight: 1.15,
 };
 
 const itemTitle = {
-  fontSize: 28,
+  fontSize: IS_SMALL_PHONE ? 22 : 28,
   fontWeight: 900,
+  lineHeight: 1.15,
+  wordBreak: "break-word",
 };
 
 const mutedText = {
   color: "#6c6760",
   marginTop: 6,
+  fontSize: IS_SMALL_PHONE ? 14 : 16,
+  lineHeight: 1.35,
+  wordBreak: "break-word",
 };
 
 const mutedTextCompact = {
   color: "#6c6760",
   marginTop: 4,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 13 : 14,
+  lineHeight: 1.3,
+  wordBreak: "break-word",
 };
 
 const inputStyle = {
   width: "100%",
-  padding: "12px 14px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 14px",
   borderRadius: 12,
   border: "2px solid #d0ccc4",
-  fontSize: 16,
+  fontSize: IS_SMALL_PHONE ? 14 : 16,
+  lineHeight: 1.25,
   boxSizing: "border-box",
   background: "#fff",
   color: "#1e1b18",
@@ -4000,79 +4016,82 @@ const inputStyle = {
 };
 
 const buttonStyle = {
-  padding: "14px 18px",
+  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  lineHeight: 1.15,
 };
 
 const secondaryButtonStyle = {
-  padding: "14px 18px",
+  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #1e1b18",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  lineHeight: 1.15,
 };
 
 const dangerButtonStyle = {
-  padding: "14px 18px",
+  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #8b1e1e",
   background: "#8b1e1e",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  lineHeight: 1.15,
 };
 
 const miniButtonStyle = {
-  padding: "10px 14px",
+  padding: IS_SMALL_PHONE ? "8px 10px" : "10px 14px",
   borderRadius: 10,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const secondaryMiniButtonStyle = {
-  padding: "10px 14px",
+  padding: IS_SMALL_PHONE ? "8px 10px" : "10px 14px",
   borderRadius: 10,
   border: "2px solid #1e1b18",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const cardStyle = {
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: 18,
-  marginBottom: 20,
+  padding: IS_SMALL_PHONE ? 14 : 18,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
 };
 
 const formCardStyle = {
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: 20,
-  marginBottom: 20,
+  padding: IS_SMALL_PHONE ? 14 : 20,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
   display: "grid",
-  gap: 12,
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const sectionCardStyle = {
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: 16,
-  marginBottom: 18,
+  padding: IS_SMALL_PHONE ? 12 : 16,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const sectionHeaderButtonStyle = {
@@ -4100,24 +4119,25 @@ const sectionChevronStyle = {
 };
 
 const pillStyle = {
-  padding: "6px 10px",
+  padding: IS_SMALL_PHONE ? "5px 8px" : "6px 10px",
   borderRadius: 999,
   background: "#f4f0e8",
   border: "2px solid #d0ccc4",
   fontWeight: 800,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const compactFormStyle = {
   display: "grid",
-  gap: 12,
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const innerCardStyle = {
   background: "#f8f5ef",
   border: "2px solid #d0ccc4",
   borderRadius: 14,
-  padding: 14,
+  padding: IS_SMALL_PHONE ? 12 : 14,
+  overflowWrap: "anywhere",
 };
 
 const menuWrapStyle = {
@@ -4141,8 +4161,9 @@ const menuMainButtonStyle = {
 };
 
 const menuTitleStyle = {
-  fontSize: 22,
+  fontSize: IS_SMALL_PHONE ? 18 : 22,
   fontWeight: 900,
+  lineHeight: 1.15,
 };
 
 const menuChevronStyle = {
@@ -4164,55 +4185,59 @@ const menuBodyStyle = {
 const modeTabsWrapStyle = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: 10,
-  marginBottom: 18,
+  gap: IS_SMALL_PHONE ? 8 : 10,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const modeTabStyle = {
-  padding: "14px 18px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 18px",
   borderRadius: 14,
   border: "2px solid #d0ccc4",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 14 : 18,
+  lineHeight: 1.15,
 };
 
 const modeTabActiveStyle = {
-  padding: "14px 18px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 18px",
   borderRadius: 14,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 14 : 18,
+  lineHeight: 1.15,
 };
 
 const subTabsWrapStyle = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-  gap: 10,
-  marginBottom: 18,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))",
+  gap: IS_SMALL_PHONE ? 8 : 10,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const subTabStyle = {
-  padding: "12px 16px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 16px",
   borderRadius: 14,
   border: "2px solid #d0ccc4",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 16,
+  fontSize: IS_SMALL_PHONE ? 13 : 16,
+  lineHeight: 1.15,
 };
 
 const subTabActiveStyle = {
-  padding: "12px 16px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 16px",
   borderRadius: 14,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 16,
+  fontSize: IS_SMALL_PHONE ? 13 : 16,
+  lineHeight: 1.15,
 };
 
 const simpleCardStyle = {
@@ -4240,27 +4265,32 @@ const simpleCardMainRowStyle = {
 const simpleCardSubRowStyle = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 12,
+  gap: 8,
   color: "#6c6760",
   marginTop: 8,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
+  flexWrap: "wrap",
+  lineHeight: 1.25,
 };
 
 const simpleCardTitleStyle = {
-  fontSize: 22,
+  fontSize: IS_SMALL_PHONE ? 18 : 22,
   fontWeight: 900,
+  lineHeight: 1.15,
+  wordBreak: "break-word",
 };
 
 const simpleCardAmountStyle = {
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
   fontWeight: 900,
+  flexShrink: 0,
 };
 
 const simpleCardActionsStyle = {
   borderTop: "2px solid #d0ccc4",
-  padding: 12,
+  padding: IS_SMALL_PHONE ? 10 : 12,
   display: "flex",
-  gap: 10,
+  gap: 8,
   flexWrap: "wrap",
   alignItems: "center",
 };
@@ -4269,16 +4299,17 @@ const selectedPanelStyle = {
   background: "#f6f1e8",
   border: "2px solid #1e1b18",
   borderRadius: 18,
-  padding: 16,
-  marginBottom: 18,
+  padding: IS_SMALL_PHONE ? 12 : 16,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
   display: "flex",
   justifyContent: "space-between",
-  gap: 12,
-  alignItems: "center",
+  gap: 10,
+  alignItems: "flex-start",
+  flexWrap: "wrap",
 };
 
 const selectedPanelLabelStyle = {
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 800,
   color: "#6c6760",
   textTransform: "uppercase",
@@ -4286,34 +4317,37 @@ const selectedPanelLabelStyle = {
 };
 
 const selectedPanelTitleStyle = {
-  fontSize: 24,
+  fontSize: IS_SMALL_PHONE ? 18 : 24,
   fontWeight: 900,
   marginTop: 4,
+  lineHeight: 1.15,
+  wordBreak: "break-word",
+  overflowWrap: "anywhere",
 };
 
 const grid2 = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : "1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const grid3 = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr 1fr",
-  gap: 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : IS_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const previewGrid = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr 1fr",
-  gap: 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const previewCard = {
   background: "#f7f4ee",
   border: "2px solid #d0ccc4",
   borderRadius: 14,
-  padding: 14,
+  padding: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const previewLabel = {
@@ -4324,76 +4358,87 @@ const previewLabel = {
 };
 
 const previewValue = {
-  fontSize: 22,
+  fontSize: IS_SMALL_PHONE ? 18 : 22,
   fontWeight: 900,
+  lineHeight: 1.15,
 };
 
 const statsGrid = {
   display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 14,
-  marginBottom: 20,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : "1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 14,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
 };
 
 const statCardStyle = {
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: 18,
+  padding: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const statLabelStyle = {
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
   color: "#6c6760",
   fontWeight: 800,
-  marginBottom: 12,
+  marginBottom: 10,
+  lineHeight: 1.2,
 };
 
 const statValueStyle = {
-  fontSize: 32,
+  fontSize: IS_SMALL_PHONE ? 26 : 32,
   fontWeight: 900,
+  lineHeight: 1.1,
 };
 
 const betweenRow = {
   display: "flex",
   justifyContent: "space-between",
   gap: 12,
-  alignItems: "center",
+  alignItems: IS_SMALL_PHONE ? "flex-start" : "center",
   marginBottom: 16,
+  flexWrap: "wrap",
 };
 
 const documentPaperStyle = {
   background: "#fffdf9",
   border: "2px solid #d0ccc4",
-  borderRadius: 16,
-  padding: 20,
+  borderRadius: IS_SMALL_PHONE ? 12 : 16,
+  padding: IS_SMALL_PHONE ? 12 : 20,
+  width: "100%",
+  boxSizing: "border-box",
+  overflowX: "hidden",
 };
 
 const documentHeaderRow = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 16,
-  marginBottom: 20,
+  gap: 12,
+  marginBottom: 16,
+  flexDirection: IS_SMALL_PHONE ? "column" : "row",
+  alignItems: IS_SMALL_PHONE ? "flex-start" : "stretch",
 };
 
 const documentBusinessNameStyle = {
-  fontSize: 28,
+  fontSize: IS_SMALL_PHONE ? 22 : 28,
   fontWeight: 900,
   marginBottom: 8,
+  lineHeight: 1.1,
 };
 
 const documentTitleStyle = {
-  fontSize: 30,
+  fontSize: IS_SMALL_PHONE ? 24 : 30,
   fontWeight: 900,
   marginBottom: 8,
+  lineHeight: 1.1,
 };
 
 const documentSection = {
-  marginBottom: 20,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
 };
 
 const documentSectionTitle = {
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 16 : 18,
   fontWeight: 900,
   marginBottom: 8,
 };
@@ -4401,9 +4446,10 @@ const documentSectionTitle = {
 const documentTableStyle = {
   display: "grid",
   gridTemplateColumns: "1fr auto",
-  gap: 10,
+  gap: IS_SMALL_PHONE ? 8 : 10,
   borderTop: "2px solid #d0ccc4",
-  paddingTop: 14,
+  paddingTop: 12,
+  fontSize: IS_SMALL_PHONE ? 14 : 16,
 };
 
 const documentTableHeaderStyle = {
@@ -4413,11 +4459,13 @@ const documentTableHeaderStyle = {
 
 const documentTableCellStyle = {
   padding: "4px 0",
+  wordBreak: "break-word",
 };
 
 const documentTableCellRightStyle = {
   padding: "4px 0",
   textAlign: "right",
+  whiteSpace: "nowrap",
 };
 
 const documentFooterStyle = {
@@ -4432,7 +4480,7 @@ const printOverlayStyle = {
   zIndex: 9999,
   background: "#f4f0e8",
   overflow: "auto",
-  padding: 18,
+  padding: IS_SMALL_PHONE ? 8 : 18,
 };
 
 const printToolbarStyle = {
@@ -4441,18 +4489,21 @@ const printToolbarStyle = {
   zIndex: 2,
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
-  gap: 12,
-  padding: "14px 16px",
+  alignItems: IS_SMALL_PHONE ? "flex-start" : "center",
+  gap: 10,
+  flexWrap: "wrap",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 16px",
   background: "#f4f0e8",
   border: "2px solid #d0ccc4",
   borderRadius: 16,
-  marginBottom: 16,
+  marginBottom: 12,
 };
 
 const printPaperWrapStyle = {
   maxWidth: 980,
+  width: "100%",
   margin: "0 auto",
+  boxSizing: "border-box",
 };
 
 function Layout() {
