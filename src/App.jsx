@@ -1,12 +1,10 @@
-import { BrowserRouter, NavLink, Route, Routes, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./lib/supabase";
 
-const APP_SCREEN_WIDTH = typeof window !== "undefined" ? window.innerWidth : 390;
-const IS_PHONE = APP_SCREEN_WIDTH <= 520;
-const IS_SMALL_PHONE = APP_SCREEN_WIDTH <= 430;
-const IS_TINY_PHONE = APP_SCREEN_WIDTH <= 390;
-
+const SCREEN_WIDTH = typeof window !== "undefined" ? window.innerWidth : 390;
+const IS_PHONE = SCREEN_WIDTH <= 520;
+const IS_SMALL_PHONE = SCREEN_WIDTH <= 430;
 
 
 function TabIconBase({ children }) {
@@ -191,6 +189,23 @@ function openMailto(to, subject, body) {
   window.location.href = mailto;
   return true;
 }
+
+function scrollToTop() {
+  if (typeof window === "undefined") return;
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function scrollToRef(ref, offset = 10) {
+  if (!ref?.current || typeof window === "undefined") return;
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      const rect = ref.current.getBoundingClientRect();
+      const top = window.scrollY + rect.top - offset;
+      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+    }, 90);
+  });
+}
+
 
 function buildJobInvoiceEmail(job, settings) {
   const clientName = job.clients?.name || "Client";
@@ -485,14 +500,14 @@ function ModeTabs({ mode, onChange, createLabel, manageLabel }) {
     <div style={modeTabsWrapStyle}>
       <button
         type="button"
-        onClick={() => onChange("create")}
+        onClick={() => { onChange("create"); scrollToTop(); }}
         style={mode === "create" ? modeTabActiveStyle : modeTabStyle}
       >
         {createLabel}
       </button>
       <button
         type="button"
-        onClick={() => onChange("manage")}
+        onClick={() => { onChange("manage"); scrollToTop(); }}
         style={mode === "manage" ? modeTabActiveStyle : modeTabStyle}
       >
         {manageLabel}
@@ -508,7 +523,7 @@ function SubTabs({ value, onChange, tabs }) {
         <button
           key={tab.value}
           type="button"
-          onClick={() => onChange(tab.value)}
+          onClick={() => { onChange(tab.value); scrollToTop(); }}
           style={value === tab.value ? subTabActiveStyle : subTabStyle}
         >
           {tab.label}
@@ -649,7 +664,7 @@ function DashboardPage() {
   ).sort((a, b) => b.total - a.total);
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={pageWrapStyle}>
       <h1 style={pageTitle}>Home</h1>
 
       <SubTabs
@@ -693,7 +708,7 @@ function DashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setHomeTab("unpaid")}
+                onClick={() => { setHomeTab("unpaid"); scrollToTop(); }}
                 style={secondaryButtonStyle}
               >
                 Open Unpaid
@@ -854,6 +869,7 @@ function JobsPage() {
   const [showFilterSection, setShowFilterSection] = useState(true);
   const [showInvoiceMenu, setShowInvoiceMenu] = useState(false);
   const [jobsViewMode, setJobsViewMode] = useState("create");
+  const jobEditRef = useRef(null);
 
   const clientMap = useMemo(() => {
     const map = {};
@@ -923,6 +939,12 @@ function JobsPage() {
       setForm((prev) => ({ ...prev, client_id: clients[0].id }));
     }
   }, [clients, form.client_id, editingJobId]);
+
+  useEffect(() => {
+    if (editingJobId && jobsViewMode === "create") {
+      scrollToRef(jobEditRef, 10);
+    }
+  }, [editingJobId, jobsViewMode]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1252,7 +1274,7 @@ function JobsPage() {
   ).length;
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={pageWrapStyle}>
       <h1 style={pageTitle}>Jobs</h1>
 
       <ModeTabs
@@ -1265,8 +1287,8 @@ function JobsPage() {
       {jobsViewMode === "create" ? (
         <>
           {editingJobId ? (
-            <div style={selectedPanelStyle}>
-              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <div ref={jobEditRef} style={{ ...selectedPanelStyle, ...animatedEditAreaStyle }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={selectedPanelLabelStyle}>Editing Job</div>
                 <div style={selectedPanelTitleStyle}>
                   {clientMap[form.client_id]?.name || "Selected client"}
@@ -1452,7 +1474,7 @@ function JobsPage() {
                 )}
               </div>
 
-              {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
+              {message ? <div style={messageStyle}>{message}</div> : null}
             </form>
           </SectionCard>
         </>
@@ -1465,7 +1487,7 @@ function JobsPage() {
 
           {selectedJob ? (
             <div style={selectedPanelStyle}>
-              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={selectedPanelLabelStyle}>Selected Job</div>
                 <div style={selectedPanelTitleStyle}>
                   {selectedJob.clients?.name || clientMap[selectedJob.client_id]?.name || "Unknown client"}
@@ -1685,6 +1707,7 @@ function MileagePage() {
   const [message, setMessage] = useState("");
   const [editingMileageId, setEditingMileageId] = useState("");
   const [form, setForm] = useState(defaultMileageForm);
+  const mileageEditRef = useRef(null);
 
   async function loadEntries() {
     setLoading(true);
@@ -1709,6 +1732,12 @@ function MileagePage() {
   useEffect(() => {
     loadEntries();
   }, []);
+
+  useEffect(() => {
+    if (editingMileageId) {
+      scrollToRef(mileageEditRef, 10);
+    }
+  }, [editingMileageId]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1824,10 +1853,10 @@ function MileagePage() {
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={pageWrapStyle}>
       <h1 style={pageTitle}>Mileage</h1>
 
-      <form onSubmit={saveEntry} style={formCardStyle}>
+      <form ref={mileageEditRef} onSubmit={saveEntry} style={editingMileageId ? { ...formCardStyle, ...animatedEditAreaStyle } : formCardStyle}>
         <div style={betweenRow}>
           <div style={sectionTitle}>
             {editingMileageId ? "Edit Mileage" : "Add Mileage"}
@@ -1895,7 +1924,7 @@ function MileagePage() {
           ) : null}
         </div>
 
-        {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
+        {message ? <div style={messageStyle}>{message}</div> : null}
       </form>
 
       <div style={{ display: "grid", gap: 12 }}>
@@ -1933,7 +1962,7 @@ function DocumentsPage({ onOpenReports, onOpenSettings, onOpenDeleted }) {
   const navigate = useNavigate();
 
   return (
-    <div style={{ paddingTop: 10 }}>
+    <div style={subPageWrapStyle}>
       <div style={cardStyle}>
         <div style={sectionTitle}>Documents Hub</div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -2131,7 +2160,7 @@ function ReportsPage() {
   }
 
   return (
-    <div style={{ paddingTop: 10 }}>
+    <div style={subPageWrapStyle}>
       <div style={cardStyle}>
         <div style={sectionTitle}>Reports</div>
 
@@ -2197,7 +2226,7 @@ function ReportsPage() {
           </button>
         </div>
 
-        {actionMessage ? <div style={{ marginTop: 14, fontWeight: 700 }}>{actionMessage}</div> : null}
+        {actionMessage ? <div style={messageStyleWithMargin}>{actionMessage}</div> : null}
       </div>
 
       {message ? <div style={cardStyle}>{message}</div> : null}
@@ -2345,7 +2374,7 @@ function SettingsPage() {
   }
 
   return (
-    <div style={{ paddingTop: 10 }}>
+    <div style={subPageWrapStyle}>
       <form onSubmit={saveSettings} style={formCardStyle}>
         <div style={sectionTitle}>Settings</div>
         {loading ? <div>Loading settings...</div> : null}
@@ -2416,7 +2445,7 @@ function SettingsPage() {
           {saving ? "Saving..." : "Save Settings"}
         </button>
 
-        {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
+        {message ? <div style={messageStyle}>{message}</div> : null}
       </form>
     </div>
   );
@@ -2452,7 +2481,8 @@ function ClientsPage() {
   const [showClientSearchSection, setShowClientSearchSection] = useState(true);
   const [showStatementMenu, setShowStatementMenu] = useState(false);
   const [showInvoiceMenu, setShowInvoiceMenu] = useState(false);
-  const [clientsViewMode, setClientsViewMode] = useState("create");
+  const [clientsViewMode, setClientsViewMode] = useState("manage");
+  const clientEditRef = useRef(null);
 
   async function loadAll() {
     setLoading(true);
@@ -2491,6 +2521,12 @@ function ClientsPage() {
   useEffect(() => {
     loadAll();
   }, []);
+
+  useEffect(() => {
+    if (editingClientId && clientsViewMode === "create") {
+      scrollToRef(clientEditRef, 10);
+    }
+  }, [editingClientId, clientsViewMode]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -2767,7 +2803,7 @@ function ClientsPage() {
   });
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={pageWrapStyle}>
       <h1 style={pageTitle}>Clients</h1>
 
       <ModeTabs
@@ -2780,8 +2816,8 @@ function ClientsPage() {
       {clientsViewMode === "create" ? (
         <>
           {editingClientId ? (
-            <div style={selectedPanelStyle}>
-              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+            <div ref={clientEditRef} style={{ ...selectedPanelStyle, ...animatedEditAreaStyle }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={selectedPanelLabelStyle}>Editing Client</div>
                 <div style={selectedPanelTitleStyle}>{form.name || "Selected client"}</div>
                 <div style={mutedTextCompact}>{form.invoice_email || "No invoice email"}</div>
@@ -2929,7 +2965,7 @@ function ClientsPage() {
                 )}
               </div>
 
-              {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
+              {message ? <div style={messageStyle}>{message}</div> : null}
             </form>
           </SectionCard>
         </>
@@ -2945,7 +2981,7 @@ function ClientsPage() {
 
           {currentClient ? (
             <div style={selectedPanelStyle}>
-              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={selectedPanelLabelStyle}>Selected Client</div>
                 <div style={selectedPanelTitleStyle}>{currentClient.name}</div>
                 <div style={mutedTextCompact}>
@@ -3050,7 +3086,7 @@ function ClientsPage() {
                   </div>
                 </ActionMenu>
 
-                {docMessage ? <div style={{ fontWeight: 700 }}>{docMessage}</div> : null}
+                {docMessage ? <div style={messageStyle}>{docMessage}</div> : null}
               </div>
             ) : (
               <div style={mutedText}>No client selected.</div>
@@ -3493,11 +3529,11 @@ function DeletedPage() {
   }
 
   return (
-    <div style={{ paddingTop: 10 }}>
+    <div style={subPageWrapStyle}>
       <div style={cardStyle}>
         <div style={sectionTitle}>Deleted</div>
 
-        {message ? <div style={{ marginBottom: 12, fontWeight: 700 }}>{message}</div> : null}
+        {message ? <div style={messageStyleWithBottomMargin}>{message}</div> : null}
         {loading ? <div>Loading deleted items...</div> : null}
 
         <div style={{ display: "grid", gap: 12 }}>
@@ -3919,7 +3955,7 @@ function OfficePage() {
   const [adminTab, setAdminTab] = useState("settings");
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={pageWrapStyle}>
       <h1 style={pageTitle}>Office</h1>
 
       <SubTabs
@@ -3965,21 +4001,42 @@ function OfficePage() {
   );
 }
 
-const pageTitle = {
-  fontSize: IS_SMALL_PHONE ? 26 : 32,
+const animatedEditAreaStyle = {
+  animation: "slideFadeIn 220ms ease-out",
+};
+
+const messageStyle = {
+  fontWeight: 700,
+  animation: "successPop 220ms ease-out",
+};
+
+const messageStyleWithMargin = {
+  marginTop: 14,
+  fontWeight: 700,
+  animation: "successPop 220ms ease-out",
+};
+
+const messageStyleWithBottomMargin = {
   marginBottom: 12,
+  fontWeight: 700,
+  animation: "successPop 220ms ease-out",
+};
+
+const pageTitle = {
+  fontSize: IS_SMALL_PHONE ? 26 : IS_PHONE ? 28 : 32,
+  marginBottom: IS_PHONE ? 10 : 12,
   lineHeight: 1.1,
 };
 
 const sectionTitle = {
-  fontSize: IS_SMALL_PHONE ? 20 : 24,
+  fontSize: IS_SMALL_PHONE ? 20 : IS_PHONE ? 22 : 24,
   fontWeight: 900,
-  marginBottom: 12,
+  marginBottom: IS_PHONE ? 10 : 12,
   lineHeight: 1.15,
 };
 
 const itemTitle = {
-  fontSize: IS_SMALL_PHONE ? 22 : 28,
+  fontSize: IS_SMALL_PHONE ? 21 : IS_PHONE ? 24 : 28,
   fontWeight: 900,
   lineHeight: 1.15,
   wordBreak: "break-word",
@@ -3988,26 +4045,21 @@ const itemTitle = {
 const mutedText = {
   color: "#6c6760",
   marginTop: 6,
-  fontSize: IS_SMALL_PHONE ? 14 : 16,
-  lineHeight: 1.35,
-  wordBreak: "break-word",
 };
 
 const mutedTextCompact = {
   color: "#6c6760",
   marginTop: 4,
-  fontSize: IS_SMALL_PHONE ? 13 : 14,
-  lineHeight: 1.3,
-  wordBreak: "break-word",
+  fontSize: IS_PHONE ? 13 : 14,
+  lineHeight: 1.35,
 };
 
 const inputStyle = {
   width: "100%",
-  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 14px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : IS_PHONE ? "11px 13px" : "12px 14px",
   borderRadius: 12,
   border: "2px solid #d0ccc4",
-  fontSize: IS_SMALL_PHONE ? 14 : 16,
-  lineHeight: 1.25,
+  fontSize: IS_PHONE ? 15 : 16,
   boxSizing: "border-box",
   background: "#fff",
   color: "#1e1b18",
@@ -4016,82 +4068,87 @@ const inputStyle = {
 };
 
 const buttonStyle = {
-  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
+  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
+  padding: IS_SMALL_PHONE ? "11px 12px" : IS_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 15 : 18,
-  lineHeight: 1.15,
+  fontSize: IS_PHONE ? 15 : 18,
 };
 
 const secondaryButtonStyle = {
-  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
+  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
+  padding: IS_SMALL_PHONE ? "11px 12px" : IS_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #1e1b18",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 15 : 18,
-  lineHeight: 1.15,
+  fontSize: 18,
 };
 
 const dangerButtonStyle = {
-  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
+  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
+  padding: IS_SMALL_PHONE ? "11px 12px" : IS_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #8b1e1e",
   background: "#8b1e1e",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 15 : 18,
-  lineHeight: 1.15,
+  fontSize: 18,
 };
 
 const miniButtonStyle = {
-  padding: IS_SMALL_PHONE ? "8px 10px" : "10px 14px",
+  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
+  padding: IS_PHONE ? "8px 10px" : "10px 14px",
   borderRadius: 10,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 12 : 14,
+  fontSize: IS_PHONE ? 12 : 14,
 };
 
 const secondaryMiniButtonStyle = {
-  padding: IS_SMALL_PHONE ? "8px 10px" : "10px 14px",
+  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
+  padding: IS_PHONE ? "8px 10px" : "10px 14px",
   borderRadius: 10,
   border: "2px solid #1e1b18",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 12 : 14,
+  fontSize: 14,
 };
 
 const cardStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 14 : 18,
-  marginBottom: IS_SMALL_PHONE ? 14 : 20,
+  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 18,
+  marginBottom: IS_PHONE ? 14 : 20,
 };
 
 const formCardStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 14 : 20,
-  marginBottom: IS_SMALL_PHONE ? 14 : 20,
+  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 20,
+  marginBottom: IS_PHONE ? 14 : 20,
   display: "grid",
-  gap: IS_SMALL_PHONE ? 10 : 12,
+  gap: IS_PHONE ? 10 : 12,
 };
 
 const sectionCardStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 12 : 16,
-  marginBottom: IS_SMALL_PHONE ? 14 : 18,
+  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 16,
+  marginBottom: IS_PHONE ? 14 : 18,
 };
 
 const sectionHeaderButtonStyle = {
@@ -4099,7 +4156,8 @@ const sectionHeaderButtonStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: 12,
+  gap: IS_PHONE ? 8 : 12,
+  flexWrap: "wrap",
   border: "none",
   background: "transparent",
   padding: 0,
@@ -4119,25 +4177,25 @@ const sectionChevronStyle = {
 };
 
 const pillStyle = {
-  padding: IS_SMALL_PHONE ? "5px 8px" : "6px 10px",
+  padding: IS_PHONE ? "5px 8px" : "6px 10px",
   borderRadius: 999,
   background: "#f4f0e8",
   border: "2px solid #d0ccc4",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 12 : 14,
+  fontSize: 14,
 };
 
 const compactFormStyle = {
   display: "grid",
-  gap: IS_SMALL_PHONE ? 10 : 12,
+  gap: IS_PHONE ? 10 : 12,
 };
 
 const innerCardStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#f8f5ef",
   border: "2px solid #d0ccc4",
   borderRadius: 14,
-  padding: IS_SMALL_PHONE ? 12 : 14,
-  overflowWrap: "anywhere",
+  padding: IS_PHONE ? 11 : 14,
 };
 
 const menuWrapStyle = {
@@ -4151,7 +4209,7 @@ const menuMainButtonStyle = {
   width: "100%",
   border: "none",
   background: "transparent",
-  padding: 16,
+  padding: IS_PHONE ? 12 : 16,
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
@@ -4161,9 +4219,8 @@ const menuMainButtonStyle = {
 };
 
 const menuTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 18 : 22,
+  fontSize: IS_SMALL_PHONE ? 18 : IS_PHONE ? 20 : 22,
   fontWeight: 900,
-  lineHeight: 1.15,
 };
 
 const menuChevronStyle = {
@@ -4179,68 +4236,65 @@ const menuChevronStyle = {
 
 const menuBodyStyle = {
   borderTop: "2px solid #d0ccc4",
-  padding: 14,
+  padding: IS_PHONE ? 11 : 14,
 };
 
 const modeTabsWrapStyle = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: IS_SMALL_PHONE ? 8 : 10,
-  marginBottom: IS_SMALL_PHONE ? 14 : 18,
+  gap: IS_PHONE ? 8 : 10,
+  marginBottom: 18,
 };
 
 const modeTabStyle = {
-  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 18px",
+  padding: IS_PHONE ? "11px 12px" : "14px 18px",
   borderRadius: 14,
   border: "2px solid #d0ccc4",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 14 : 18,
-  lineHeight: 1.15,
+  fontSize: 18,
 };
 
 const modeTabActiveStyle = {
-  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 18px",
+  padding: IS_PHONE ? "11px 12px" : "14px 18px",
   borderRadius: 14,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 14 : 18,
-  lineHeight: 1.15,
+  fontSize: 18,
 };
 
 const subTabsWrapStyle = {
   display: "grid",
   gridTemplateColumns: IS_SMALL_PHONE ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))",
-  gap: IS_SMALL_PHONE ? 8 : 10,
-  marginBottom: IS_SMALL_PHONE ? 14 : 18,
+  gap: IS_PHONE ? 8 : 10,
+  marginBottom: 18,
 };
 
 const subTabStyle = {
-  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 16px",
+  padding: IS_PHONE ? "10px 12px" : "12px 16px",
   borderRadius: 14,
   border: "2px solid #d0ccc4",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 13 : 16,
-  lineHeight: 1.15,
+  fontSize: 16,
 };
 
 const subTabActiveStyle = {
-  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 16px",
+  padding: IS_PHONE ? "10px 12px" : "12px 16px",
   borderRadius: 14,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_SMALL_PHONE ? 13 : 16,
-  lineHeight: 1.15,
+  fontSize: 16,
 };
 
 const simpleCardStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   border: "2px solid #d0ccc4",
   borderRadius: 16,
   overflow: "hidden",
@@ -4250,7 +4304,7 @@ const simpleCardButtonStyle = {
   width: "100%",
   border: "none",
   background: "transparent",
-  padding: 14,
+  padding: IS_PHONE ? 11 : 14,
   textAlign: "left",
   cursor: "pointer",
 };
@@ -4258,58 +4312,58 @@ const simpleCardButtonStyle = {
 const simpleCardMainRowStyle = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 12,
+  gap: 8,
   alignItems: "center",
+  flexWrap: "wrap",
 };
 
 const simpleCardSubRowStyle = {
   display: "flex",
   justifyContent: "space-between",
   gap: 8,
+  flexWrap: "wrap",
   color: "#6c6760",
   marginTop: 8,
-  fontSize: IS_SMALL_PHONE ? 12 : 14,
-  flexWrap: "wrap",
-  lineHeight: 1.25,
+  fontSize: 14,
 };
 
 const simpleCardTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 18 : 22,
+  fontSize: IS_SMALL_PHONE ? 17 : IS_PHONE ? 19 : 22,
   fontWeight: 900,
   lineHeight: 1.15,
   wordBreak: "break-word",
 };
 
 const simpleCardAmountStyle = {
-  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  fontSize: IS_PHONE ? 15 : 18,
   fontWeight: 900,
-  flexShrink: 0,
 };
 
 const simpleCardActionsStyle = {
   borderTop: "2px solid #d0ccc4",
-  padding: IS_SMALL_PHONE ? 10 : 12,
+  padding: IS_PHONE ? 10 : 12,
   display: "flex",
-  gap: 8,
+  gap: 10,
   flexWrap: "wrap",
   alignItems: "center",
 };
 
 const selectedPanelStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#f6f1e8",
   border: "2px solid #1e1b18",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 12 : 16,
-  marginBottom: IS_SMALL_PHONE ? 14 : 18,
+  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 16,
+  marginBottom: IS_PHONE ? 14 : 18,
   display: "flex",
   justifyContent: "space-between",
   gap: 10,
-  alignItems: "flex-start",
+  alignItems: "center",
   flexWrap: "wrap",
 };
 
 const selectedPanelLabelStyle = {
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 800,
   color: "#6c6760",
   textTransform: "uppercase",
@@ -4317,7 +4371,7 @@ const selectedPanelLabelStyle = {
 };
 
 const selectedPanelTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 18 : 24,
+  fontSize: IS_SMALL_PHONE ? 18 : IS_PHONE ? 20 : 24,
   fontWeight: 900,
   marginTop: 4,
   lineHeight: 1.15,
@@ -4327,27 +4381,27 @@ const selectedPanelTitleStyle = {
 
 const grid2 = {
   display: "grid",
-  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : "1fr 1fr",
-  gap: IS_SMALL_PHONE ? 10 : 12,
+  gridTemplateColumns: IS_PHONE ? "1fr" : "1fr 1fr",
+  gap: IS_PHONE ? 10 : 12,
 };
 
 const grid3 = {
   display: "grid",
-  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : IS_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
-  gap: IS_SMALL_PHONE ? 10 : 12,
+  gridTemplateColumns: IS_PHONE ? "1fr" : "1fr 1fr 1fr",
+  gap: IS_PHONE ? 10 : 12,
 };
 
 const previewGrid = {
   display: "grid",
-  gridTemplateColumns: IS_SMALL_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
-  gap: IS_SMALL_PHONE ? 10 : 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : IS_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
+  gap: IS_PHONE ? 10 : 12,
 };
 
 const previewCard = {
   background: "#f7f4ee",
   border: "2px solid #d0ccc4",
   borderRadius: 14,
-  padding: IS_SMALL_PHONE ? 12 : 14,
+  padding: IS_PHONE ? 10 : 14,
 };
 
 const previewLabel = {
@@ -4358,44 +4412,42 @@ const previewLabel = {
 };
 
 const previewValue = {
-  fontSize: IS_SMALL_PHONE ? 18 : 22,
+  fontSize: IS_SMALL_PHONE ? 18 : IS_PHONE ? 20 : 22,
   fontWeight: 900,
-  lineHeight: 1.15,
 };
 
 const statsGrid = {
   display: "grid",
   gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : "1fr 1fr",
-  gap: IS_SMALL_PHONE ? 10 : 14,
-  marginBottom: IS_SMALL_PHONE ? 14 : 20,
+  gap: IS_PHONE ? 10 : 14,
+  marginBottom: 20,
 };
 
 const statCardStyle = {
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 14 : 18,
+  padding: IS_PHONE ? 12 : 18,
 };
 
 const statLabelStyle = {
-  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  fontSize: IS_PHONE ? 14 : 18,
   color: "#6c6760",
   fontWeight: 800,
-  marginBottom: 10,
-  lineHeight: 1.2,
+  marginBottom: 12,
 };
 
 const statValueStyle = {
-  fontSize: IS_SMALL_PHONE ? 26 : 32,
+  fontSize: IS_SMALL_PHONE ? 22 : IS_PHONE ? 26 : 32,
   fontWeight: 900,
-  lineHeight: 1.1,
 };
 
 const betweenRow = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 12,
-  alignItems: IS_SMALL_PHONE ? "flex-start" : "center",
+  gap: 10,
+  alignItems: "center",
   marginBottom: 16,
   flexWrap: "wrap",
 };
@@ -4403,10 +4455,10 @@ const betweenRow = {
 const documentPaperStyle = {
   background: "#fffdf9",
   border: "2px solid #d0ccc4",
-  borderRadius: IS_SMALL_PHONE ? 12 : 16,
-  padding: IS_SMALL_PHONE ? 12 : 20,
+  borderRadius: 16,
+  padding: IS_SMALL_PHONE ? 10 : IS_PHONE ? 12 : 20,
   width: "100%",
-  boxSizing: "border-box",
+  maxWidth: "100%",
   overflowX: "hidden",
 };
 
@@ -4414,31 +4466,28 @@ const documentHeaderRow = {
   display: "flex",
   justifyContent: "space-between",
   gap: 12,
-  marginBottom: 16,
-  flexDirection: IS_SMALL_PHONE ? "column" : "row",
-  alignItems: IS_SMALL_PHONE ? "flex-start" : "stretch",
+  marginBottom: IS_PHONE ? 14 : 20,
+  flexWrap: "wrap",
 };
 
 const documentBusinessNameStyle = {
-  fontSize: IS_SMALL_PHONE ? 22 : 28,
+  fontSize: IS_SMALL_PHONE ? 20 : IS_PHONE ? 22 : 28,
   fontWeight: 900,
   marginBottom: 8,
-  lineHeight: 1.1,
 };
 
 const documentTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 24 : 30,
+  fontSize: IS_SMALL_PHONE ? 22 : IS_PHONE ? 24 : 30,
   fontWeight: 900,
   marginBottom: 8,
-  lineHeight: 1.1,
 };
 
 const documentSection = {
-  marginBottom: IS_SMALL_PHONE ? 14 : 20,
+  marginBottom: IS_PHONE ? 14 : 20,
 };
 
 const documentSectionTitle = {
-  fontSize: IS_SMALL_PHONE ? 16 : 18,
+  fontSize: IS_PHONE ? 16 : 18,
   fontWeight: 900,
   marginBottom: 8,
 };
@@ -4446,10 +4495,9 @@ const documentSectionTitle = {
 const documentTableStyle = {
   display: "grid",
   gridTemplateColumns: "1fr auto",
-  gap: IS_SMALL_PHONE ? 8 : 10,
+  gap: 10,
   borderTop: "2px solid #d0ccc4",
-  paddingTop: 12,
-  fontSize: IS_SMALL_PHONE ? 14 : 16,
+  paddingTop: 14,
 };
 
 const documentTableHeaderStyle = {
@@ -4459,13 +4507,11 @@ const documentTableHeaderStyle = {
 
 const documentTableCellStyle = {
   padding: "4px 0",
-  wordBreak: "break-word",
 };
 
 const documentTableCellRightStyle = {
   padding: "4px 0",
   textAlign: "right",
-  whiteSpace: "nowrap",
 };
 
 const documentFooterStyle = {
@@ -4480,7 +4526,7 @@ const printOverlayStyle = {
   zIndex: 9999,
   background: "#f4f0e8",
   overflow: "auto",
-  padding: IS_SMALL_PHONE ? 8 : 18,
+  padding: IS_PHONE ? 8 : 18,
 };
 
 const printToolbarStyle = {
@@ -4489,30 +4535,43 @@ const printToolbarStyle = {
   zIndex: 2,
   display: "flex",
   justifyContent: "space-between",
-  alignItems: IS_SMALL_PHONE ? "flex-start" : "center",
+  alignItems: "center",
   gap: 10,
   flexWrap: "wrap",
-  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 16px",
+  padding: IS_PHONE ? "10px 12px" : "14px 16px",
   background: "#f4f0e8",
   border: "2px solid #d0ccc4",
   borderRadius: 16,
-  marginBottom: 12,
+  marginBottom: 16,
 };
 
 const printPaperWrapStyle = {
-  maxWidth: 980,
   width: "100%",
+  maxWidth: IS_PHONE ? 420 : 980,
   margin: "0 auto",
-  boxSizing: "border-box",
+};
+
+const pageWrapStyle = {
+  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 24,
+};
+
+const subPageWrapStyle = {
+  paddingTop: IS_PHONE ? 6 : 10,
 };
 
 function Layout() {
+  const location = useLocation();
+
+  useEffect(() => {
+    scrollToTop();
+  }, [location.pathname]);
+
   const screenWidth = typeof window !== "undefined" ? window.innerWidth : 390;
-  const isPhoneScreen = screenWidth <= 520;
+  const isPhoneScreen = screenWidth <= 560;
   const isVeryNarrowPhone = screenWidth <= 420;
 
   const navStyle = ({ isActive }) => ({
-    padding: isVeryNarrowPhone ? "6px 1px" : isPhoneScreen ? "7px 2px" : "8px 6px",
+    padding: isVeryNarrowPhone ? "5px 1px" : isPhoneScreen ? "6px 2px" : "8px 6px",
     borderRadius: isVeryNarrowPhone ? 8 : isPhoneScreen ? 10 : 12,
     textDecoration: "none",
     color: isActive ? "#fff" : "#1e1b18",
@@ -4520,7 +4579,7 @@ function Layout() {
     border: isVeryNarrowPhone ? "1px solid #d0ccc4" : "2px solid #d0ccc4",
     textAlign: "center",
     minWidth: 0,
-    minHeight: isVeryNarrowPhone ? 32 : isPhoneScreen ? 36 : 42,
+    minHeight: isVeryNarrowPhone ? 30 : isPhoneScreen ? 34 : 42,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -4533,13 +4592,13 @@ function Layout() {
         minHeight: "100vh",
         background: "#f4f0e8",
         color: "#1e1b18",
-        paddingBottom: isVeryNarrowPhone ? 52 : isPhoneScreen ? 58 : 72,
+        paddingBottom: isVeryNarrowPhone ? 50 : isPhoneScreen ? 56 : 72,
       }}
     >
       <div style={{ padding: isPhoneScreen ? 16 : 20 }}>
         <h1
           style={{
-            fontSize: isVeryNarrowPhone ? 26 : isPhoneScreen ? 28 : 32,
+            fontSize: isVeryNarrowPhone ? 24 : isPhoneScreen ? 26 : 32,
             margin: 0,
             fontWeight: 900,
             color: "#1e1b18",
@@ -4549,7 +4608,7 @@ function Layout() {
         </h1>
         <p
           style={{
-            fontSize: isVeryNarrowPhone ? 14 : isPhoneScreen ? 15 : 18,
+            fontSize: isVeryNarrowPhone ? 13 : isPhoneScreen ? 14 : 18,
             color: "#4f4a45",
             marginTop: 8,
           }}
@@ -4558,13 +4617,15 @@ function Layout() {
         </p>
       </div>
 
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/jobs" element={<JobsPage />} />
-        <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/mileage" element={<MileagePage />} />
-        <Route path="/office" element={<OfficePage />} />
-      </Routes>
+      <div key={location.pathname} className="page-transition">
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/mileage" element={<MileagePage />} />
+          <Route path="/office" element={<OfficePage />} />
+        </Routes>
+      </div>
 
       <nav
         style={{
@@ -4574,8 +4635,8 @@ function Layout() {
           bottom: 0,
           display: "grid",
           gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-          gap: isVeryNarrowPhone ? 1 : isPhoneScreen ? 2 : 4,
-          padding: isVeryNarrowPhone ? 3 : isPhoneScreen ? 4 : 6,
+          gap: isVeryNarrowPhone ? 1 : isPhoneScreen ? 1.5 : 4,
+          padding: isVeryNarrowPhone ? 2 : isPhoneScreen ? 3 : 6,
           background: "#f4f0e8",
           borderTop: "1px solid #d0ccc4",
           boxSizing: "border-box",
