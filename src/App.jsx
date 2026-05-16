@@ -1,10 +1,12 @@
-import { BrowserRouter, NavLink, Route, Routes, useNavigate, useLocation } from "react-router-dom";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { BrowserRouter, NavLink, Route, Routes, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./lib/supabase";
 
-const SCREEN_WIDTH = typeof window !== "undefined" ? window.innerWidth : 390;
-const IS_PHONE = SCREEN_WIDTH <= 520;
-const IS_SMALL_PHONE = SCREEN_WIDTH <= 430;
+const APP_SCREEN_WIDTH = typeof window !== "undefined" ? window.innerWidth : 390;
+const IS_PHONE = APP_SCREEN_WIDTH <= 520;
+const IS_SMALL_PHONE = APP_SCREEN_WIDTH <= 430;
+const IS_TINY_PHONE = APP_SCREEN_WIDTH <= 390;
+
 
 
 function TabIconBase({ children }) {
@@ -134,9 +136,44 @@ function money(n) {
   return `$${Number(n || 0).toFixed(2)}`;
 }
 
+function parseLocalDate(value, endOfDay = false) {
+  if (!value) return new Date(NaN);
+
+  if (value instanceof Date) {
+    const d = new Date(value);
+    if (endOfDay) d.setHours(23, 59, 59, 999);
+    return d;
+  }
+
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(
+      year,
+      month - 1,
+      day,
+      endOfDay ? 23 : 0,
+      endOfDay ? 59 : 0,
+      endOfDay ? 59 : 0,
+      endOfDay ? 999 : 0
+    );
+  }
+
+  const d = new Date(value);
+  if (endOfDay) d.setHours(23, 59, 59, 999);
+  return d;
+}
+
 function formatDate(value) {
   if (!value) return "";
-  return new Date(value).toLocaleDateString();
+  return parseLocalDate(value).toLocaleDateString();
+}
+
+function localDateInputValue(date = new Date()) {
+  const d = parseLocalDate(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function sumJobs(jobs) {
@@ -189,23 +226,6 @@ function openMailto(to, subject, body) {
   window.location.href = mailto;
   return true;
 }
-
-function scrollToTop() {
-  if (typeof window === "undefined") return;
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function scrollToRef(ref, offset = 10) {
-  if (!ref?.current || typeof window === "undefined") return;
-  requestAnimationFrame(() => {
-    setTimeout(() => {
-      const rect = ref.current.getBoundingClientRect();
-      const top = window.scrollY + rect.top - offset;
-      window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
-    }, 90);
-  });
-}
-
 
 function buildJobInvoiceEmail(job, settings) {
   const clientName = job.clients?.name || "Client";
@@ -328,11 +348,11 @@ function buildReportEmail(preview, settings) {
     `Daily mileage: ${cleanNumber(preview.dailyMileageTotal)} km`,
     `Combined mileage: ${cleanNumber(preview.totals.mileage + preview.dailyMileageTotal)} km`,
     "",
-    `Customer rankings:`,
+    `Customer rankings sorted by: ${preview.rankLabel || "Total $"} high to low`,
     ...(preview.rankings.length
       ? preview.rankings.map(
           (row) =>
-            `- ${row.clientName} | Service ${money(row.service)} | Hours ${cleanNumber(
+            `- ${row.clientName} | Total ${money(row.total)} | Hours ${cleanNumber(
               row.hours
             )} | Jobs ${row.jobs} | $/Hour ${money(row.valuePerHour)} | $/Job ${money(
               row.valuePerJob
@@ -387,7 +407,7 @@ const defaultSettings = {
 
 const defaultJobForm = {
   client_id: "",
-  job_date: new Date().toISOString().split("T")[0],
+  job_date: localDateInputValue(),
   notes: "",
   hours_mode: "use_client",
   pay_mode: "use_client",
@@ -402,13 +422,13 @@ const defaultJobForm = {
 };
 
 const defaultMileageForm = {
-  mileage_date: new Date().toISOString().split("T")[0],
+  mileage_date: localDateInputValue(),
   mileage: "",
   vehicle: "",
   notes: "",
 };
 
-function PrintPreviewOverlay({ title, onClose, children }) {
+function PrintPreviewOverlay({ title, onClose, onEmail, toolbarContent, children }) {
   return (
     <div className="print-preview-screen" style={printOverlayStyle}>
       <style>{`
@@ -445,7 +465,19 @@ function PrintPreviewOverlay({ title, onClose, children }) {
 
       <div className="print-preview-toolbar" style={printToolbarStyle}>
         <div style={{ fontSize: 24, fontWeight: 900 }}>{title}</div>
+
+        {toolbarContent ? (
+          <div style={{ flex: "1 1 100%", display: "grid", gap: 10 }}>
+            {toolbarContent}
+          </div>
+        ) : null}
+
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {onEmail ? (
+            <button type="button" onClick={onEmail} style={buttonStyle}>
+              Email Report
+            </button>
+          ) : null}
           <button type="button" onClick={() => window.print()} style={buttonStyle}>
             Print / Save PDF
           </button>
@@ -500,14 +532,14 @@ function ModeTabs({ mode, onChange, createLabel, manageLabel }) {
     <div style={modeTabsWrapStyle}>
       <button
         type="button"
-        onClick={() => { onChange("create"); scrollToTop(); }}
+        onClick={() => onChange("create")}
         style={mode === "create" ? modeTabActiveStyle : modeTabStyle}
       >
         {createLabel}
       </button>
       <button
         type="button"
-        onClick={() => { onChange("manage"); scrollToTop(); }}
+        onClick={() => onChange("manage")}
         style={mode === "manage" ? modeTabActiveStyle : modeTabStyle}
       >
         {manageLabel}
@@ -523,7 +555,7 @@ function SubTabs({ value, onChange, tabs }) {
         <button
           key={tab.value}
           type="button"
-          onClick={() => { onChange(tab.value); scrollToTop(); }}
+          onClick={() => onChange(tab.value)}
           style={value === tab.value ? subTabActiveStyle : subTabStyle}
         >
           {tab.label}
@@ -613,12 +645,12 @@ function DashboardPage() {
   }, []);
 
   const thisWeekJobs = jobs.filter((job) => {
-    const d = new Date(job.job_date);
+    const d = parseLocalDate(job.job_date);
     return d >= weekRange.monday && d <= weekRange.sunday;
   });
 
   const thisWeekMileageEntries = dailyMileage.filter((entry) => {
-    const d = new Date(entry.mileage_date);
+    const d = parseLocalDate(entry.mileage_date);
     return d >= weekRange.monday && d <= weekRange.sunday;
   });
 
@@ -664,7 +696,7 @@ function DashboardPage() {
   ).sort((a, b) => b.total - a.total);
 
   return (
-    <div style={pageWrapStyle}>
+    <div style={{ padding: 24 }}>
       <h1 style={pageTitle}>Home</h1>
 
       <SubTabs
@@ -708,7 +740,7 @@ function DashboardPage() {
               </div>
               <button
                 type="button"
-                onClick={() => { setHomeTab("unpaid"); scrollToTop(); }}
+                onClick={() => setHomeTab("unpaid")}
                 style={secondaryButtonStyle}
               >
                 Open Unpaid
@@ -869,7 +901,6 @@ function JobsPage() {
   const [showFilterSection, setShowFilterSection] = useState(true);
   const [showInvoiceMenu, setShowInvoiceMenu] = useState(false);
   const [jobsViewMode, setJobsViewMode] = useState("create");
-  const jobEditRef = useRef(null);
 
   const clientMap = useMemo(() => {
     const map = {};
@@ -940,12 +971,6 @@ function JobsPage() {
     }
   }, [clients, form.client_id, editingJobId]);
 
-  useEffect(() => {
-    if (editingJobId && jobsViewMode === "create") {
-      scrollToRef(jobEditRef, 10);
-    }
-  }, [editingJobId, jobsViewMode]);
-
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -973,7 +998,7 @@ function JobsPage() {
     setJobsViewMode("create");
     setForm({
       client_id: job.client_id || "",
-      job_date: job.job_date || new Date().toISOString().split("T")[0],
+      job_date: job.job_date || localDateInputValue(),
       notes: job.notes || "",
       hours_mode: job.hours_mode || "use_client",
       pay_mode: job.pay_mode || "use_client",
@@ -1228,13 +1253,13 @@ function JobsPage() {
     monday.setDate(now.getDate() + diffToMonday);
     monday.setHours(0, 0, 0, 0);
 
-    if (filter === "historical" && new Date(job.job_date) >= monday) return false;
+    if (filter === "historical" && parseLocalDate(job.job_date) >= monday) return false;
 
     if (filter === "week") {
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
       sunday.setHours(23, 59, 59, 999);
-      const jobDate = new Date(job.job_date);
+      const jobDate = parseLocalDate(job.job_date);
       if (!(jobDate >= monday && jobDate <= sunday)) return false;
     }
 
@@ -1274,7 +1299,7 @@ function JobsPage() {
   ).length;
 
   return (
-    <div style={pageWrapStyle}>
+    <div style={{ padding: 24 }}>
       <h1 style={pageTitle}>Jobs</h1>
 
       <ModeTabs
@@ -1287,8 +1312,8 @@ function JobsPage() {
       {jobsViewMode === "create" ? (
         <>
           {editingJobId ? (
-            <div ref={jobEditRef} style={{ ...selectedPanelStyle, ...animatedEditAreaStyle }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={selectedPanelStyle}>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Editing Job</div>
                 <div style={selectedPanelTitleStyle}>
                   {clientMap[form.client_id]?.name || "Selected client"}
@@ -1474,7 +1499,7 @@ function JobsPage() {
                 )}
               </div>
 
-              {message ? <div style={messageStyle}>{message}</div> : null}
+              {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
             </form>
           </SectionCard>
         </>
@@ -1487,7 +1512,7 @@ function JobsPage() {
 
           {selectedJob ? (
             <div style={selectedPanelStyle}>
-              <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Selected Job</div>
                 <div style={selectedPanelTitleStyle}>
                   {selectedJob.clients?.name || clientMap[selectedJob.client_id]?.name || "Unknown client"}
@@ -1707,7 +1732,6 @@ function MileagePage() {
   const [message, setMessage] = useState("");
   const [editingMileageId, setEditingMileageId] = useState("");
   const [form, setForm] = useState(defaultMileageForm);
-  const mileageEditRef = useRef(null);
 
   async function loadEntries() {
     setLoading(true);
@@ -1733,12 +1757,6 @@ function MileagePage() {
     loadEntries();
   }, []);
 
-  useEffect(() => {
-    if (editingMileageId) {
-      scrollToRef(mileageEditRef, 10);
-    }
-  }, [editingMileageId]);
-
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -1746,7 +1764,7 @@ function MileagePage() {
   function resetMileageForm() {
     setEditingMileageId("");
     setForm({
-      mileage_date: new Date().toISOString().split("T")[0],
+      mileage_date: localDateInputValue(),
       mileage: "",
       vehicle: "",
       notes: "",
@@ -1756,7 +1774,7 @@ function MileagePage() {
   function startEditMileage(entry) {
     setEditingMileageId(entry.id);
     setForm({
-      mileage_date: entry.mileage_date || new Date().toISOString().split("T")[0],
+      mileage_date: entry.mileage_date || localDateInputValue(),
       mileage: entry.mileage ?? "",
       vehicle: entry.vehicle || "",
       notes: entry.notes || "",
@@ -1853,10 +1871,10 @@ function MileagePage() {
   }
 
   return (
-    <div style={pageWrapStyle}>
+    <div style={{ padding: 24 }}>
       <h1 style={pageTitle}>Mileage</h1>
 
-      <form ref={mileageEditRef} onSubmit={saveEntry} style={editingMileageId ? { ...formCardStyle, ...animatedEditAreaStyle } : formCardStyle}>
+      <form onSubmit={saveEntry} style={formCardStyle}>
         <div style={betweenRow}>
           <div style={sectionTitle}>
             {editingMileageId ? "Edit Mileage" : "Add Mileage"}
@@ -1924,7 +1942,7 @@ function MileagePage() {
           ) : null}
         </div>
 
-        {message ? <div style={messageStyle}>{message}</div> : null}
+        {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
       </form>
 
       <div style={{ display: "grid", gap: 12 }}>
@@ -1962,7 +1980,7 @@ function DocumentsPage({ onOpenReports, onOpenSettings, onOpenDeleted }) {
   const navigate = useNavigate();
 
   return (
-    <div style={subPageWrapStyle}>
+    <div style={{ paddingTop: 10 }}>
       <div style={cardStyle}>
         <div style={sectionTitle}>Documents Hub</div>
         <div style={{ display: "grid", gap: 12 }}>
@@ -2021,6 +2039,7 @@ function DocumentsPage({ onOpenReports, onOpenSettings, onOpenDeleted }) {
 }
 
 function ReportsPage() {
+  // REPORTS_ALWAYS_VISIBLE_NO_GENERATE_PREVIEW_V2
   const [clients, setClients] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [dailyMileage, setDailyMileage] = useState([]);
@@ -2033,7 +2052,8 @@ function ReportsPage() {
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [actionMessage, setActionMessage] = useState("");
-  const [reportPreview, setReportPreview] = useState(null);
+  const [printReportPreview, setPrintReportPreview] = useState(null);
+  const [reportRankBy, setReportRankBy] = useState("total");
 
   useEffect(() => {
     async function loadReportData() {
@@ -2086,14 +2106,14 @@ function ReportsPage() {
   );
 
   const filteredJobs = jobs.filter((job) => {
-    const jobDate = new Date(job.job_date);
+    const jobDate = parseLocalDate(job.job_date);
     if (jobDate < dateRange.start || jobDate > dateRange.end) return false;
     if (scope === "client" && clientId && job.client_id !== clientId) return false;
     return true;
   });
 
   const filteredDailyMileage = dailyMileage.filter((entry) => {
-    const d = new Date(entry.mileage_date);
+    const d = parseLocalDate(entry.mileage_date);
     return d >= dateRange.start && d <= dateRange.end;
   });
 
@@ -2110,22 +2130,34 @@ function ReportsPage() {
       rankingMap[key] = {
         clientName: job.clients?.name || "Unknown",
         service: 0,
+        total: 0,
         hours: 0,
         jobs: 0,
       };
     }
     rankingMap[key].service += Number(job.service_amount || 0);
+    rankingMap[key].total += Number(job.total_value || 0);
     rankingMap[key].hours += Number(job.hours || 0);
     rankingMap[key].jobs += 1;
   });
 
+  const rankLabels = {
+    total: "Total $",
+    jobs: "# Jobs",
+    hours: "# Hours",
+  };
+
   const rankings = Object.values(rankingMap)
     .map((row) => ({
       ...row,
-      valuePerHour: row.hours ? row.service / row.hours : 0,
-      valuePerJob: row.jobs ? row.service / row.jobs : 0,
+      valuePerHour: row.hours ? row.total / row.hours : 0,
+      valuePerJob: row.jobs ? row.total / row.jobs : 0,
     }))
-    .sort((a, b) => b.valuePerHour - a.valuePerHour);
+    .sort((a, b) => {
+      const diff = Number(b[reportRankBy] || 0) - Number(a[reportRankBy] || 0);
+      if (diff !== 0) return diff;
+      return a.clientName.localeCompare(b.clientName);
+    });
 
   const selectedClient = clients.find((client) => client.id === clientId) || null;
   const scopeLabel = scope === "client"
@@ -2141,12 +2173,9 @@ function ReportsPage() {
     totals,
     dailyMileageTotal,
     rankings,
+    rankBy: reportRankBy,
+    rankLabel: rankLabels[reportRankBy] || "Total $",
   };
-
-  function handlePreviewReport() {
-    setReportPreview(reportData);
-    setActionMessage("Report print preview opened.");
-  }
 
   function handleEmailReport() {
     const email = buildReportEmail(reportData, settings);
@@ -2159,10 +2188,18 @@ function ReportsPage() {
     setActionMessage("Report email draft opened in your email app.");
   }
 
+  function handlePrintReport() {
+    setPrintReportPreview(reportData);
+    setActionMessage("Report print preview opened.");
+  }
+
   return (
-    <div style={subPageWrapStyle}>
+    <div style={{ paddingTop: 10 }}>
       <div style={cardStyle}>
         <div style={sectionTitle}>Reports</div>
+        <div style={{ ...mutedTextCompact, marginBottom: 12 }}>
+          Live report view — no Generate Preview button in this version.
+        </div>
 
         <div style={{ display: "grid", gap: 12 }}>
           <select value={scope} onChange={(e) => setScope(e.target.value)} style={inputStyle}>
@@ -2213,26 +2250,29 @@ function ReportsPage() {
             style={inputStyle}
           />
         </div>
+
+        {message ? <div style={{ marginTop: 14, fontWeight: 700 }}>{message}</div> : null}
+        {actionMessage ? <div style={{ marginTop: 14, fontWeight: 700 }}>{actionMessage}</div> : null}
       </div>
 
       <div style={cardStyle}>
-        <div style={sectionTitle}>Report Actions</div>
-        <div style={grid2}>
-          <button type="button" onClick={handlePreviewReport} style={buttonStyle}>
-            Preview Report
-          </button>
+        <div style={betweenRow}>
+          <div>
+            <div style={sectionTitle}>Report</div>
+            <div style={mutedTextCompact}>
+              Scope: {scopeLabel} | Period: {formatDate(dateRange.start)} to {formatDate(dateRange.end)}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...grid2, marginBottom: 16 }}>
           <button type="button" onClick={handleEmailReport} style={buttonStyle}>
             Email Report
           </button>
+          <button type="button" onClick={handlePrintReport} style={secondaryButtonStyle}>
+            Print / Save PDF
+          </button>
         </div>
-
-        {actionMessage ? <div style={messageStyleWithMargin}>{actionMessage}</div> : null}
-      </div>
-
-      {message ? <div style={cardStyle}>{message}</div> : null}
-
-      <div style={cardStyle}>
-        <div style={sectionTitle}>Report Preview</div>
 
         {loading ? <div>Loading report...</div> : null}
 
@@ -2256,43 +2296,75 @@ function ReportsPage() {
               </div>
             </div>
 
-            <div style={{ marginTop: 18, fontSize: 22, fontWeight: 900 }}>
-              Customer Rankings
+            <div style={{ marginTop: 16, marginBottom: 12 }}>
+              <div style={{ ...sectionTitle, marginBottom: 10 }}>Rank customers by</div>
+              <div style={grid3}>
+                <button
+                  type="button"
+                  onClick={() => setReportRankBy("total")}
+                  style={reportRankBy === "total" ? buttonStyle : secondaryButtonStyle}
+                >
+                  Total $
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportRankBy("jobs")}
+                  style={reportRankBy === "jobs" ? buttonStyle : secondaryButtonStyle}
+                >
+                  # Jobs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReportRankBy("hours")}
+                  style={reportRankBy === "hours" ? buttonStyle : secondaryButtonStyle}
+                >
+                  # Hours
+                </button>
+              </div>
             </div>
 
-            <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            <div style={documentSection}>
+              <div style={documentSectionTitle}>Customer Rankings</div>
+              <div style={mutedText}>
+                Sorted by {rankLabels[reportRankBy] || "Total $"} high to low.
+              </div>
+
               {rankings.length === 0 ? (
-                <div>No jobs in this report range.</div>
+                <div style={{ marginTop: 10 }}>No jobs in this report range.</div>
               ) : (
-                rankings.map((row, idx) => (
-                  <div key={idx} style={innerCardStyle}>
-                    <div style={{ fontSize: 20, fontWeight: 900 }}>{row.clientName}</div>
-                    <div style={mutedText}>
-                      Service only: {money(row.service)} | Hours: {cleanNumber(row.hours)} | Jobs: {row.jobs}
+                <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+                  {rankings.map((row, idx) => (
+                    <div key={idx} style={innerCardStyle}>
+                      <div style={{ fontWeight: 900 }}>
+                        {idx + 1}. {row.clientName}
+                      </div>
+                      <div style={mutedText}>
+                        Total: {money(row.total)} | Service: {money(row.service)} | Hours: {cleanNumber(row.hours)} | Jobs: {row.jobs}
+                      </div>
+                      <div style={mutedText}>
+                        $ / Hour: {money(row.valuePerHour)} | $ / Job: {money(row.valuePerJob)}
+                      </div>
                     </div>
-                    <div style={mutedText}>
-                      $ / Hour: {money(row.valuePerHour)} | $ / Job: {money(row.valuePerJob)}
-                    </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
           </>
         ) : null}
       </div>
 
-      {reportPreview ? (
+      {printReportPreview ? (
         <PrintPreviewOverlay
           title="Report Print Preview"
-          onClose={() => setReportPreview(null)}
+          onClose={() => setPrintReportPreview(null)}
+          onEmail={handleEmailReport}
         >
-          <ReportDocument preview={reportPreview} settings={settings} />
+          <ReportDocument preview={reportData} settings={settings} />
         </PrintPreviewOverlay>
       ) : null}
     </div>
   );
 }
-
 function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2374,7 +2446,7 @@ function SettingsPage() {
   }
 
   return (
-    <div style={subPageWrapStyle}>
+    <div style={{ paddingTop: 10 }}>
       <form onSubmit={saveSettings} style={formCardStyle}>
         <div style={sectionTitle}>Settings</div>
         {loading ? <div>Loading settings...</div> : null}
@@ -2445,7 +2517,7 @@ function SettingsPage() {
           {saving ? "Saving..." : "Save Settings"}
         </button>
 
-        {message ? <div style={messageStyle}>{message}</div> : null}
+        {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
       </form>
     </div>
   );
@@ -2481,8 +2553,7 @@ function ClientsPage() {
   const [showClientSearchSection, setShowClientSearchSection] = useState(true);
   const [showStatementMenu, setShowStatementMenu] = useState(false);
   const [showInvoiceMenu, setShowInvoiceMenu] = useState(false);
-  const [clientsViewMode, setClientsViewMode] = useState("manage");
-  const clientEditRef = useRef(null);
+  const [clientsViewMode, setClientsViewMode] = useState("create");
 
   async function loadAll() {
     setLoading(true);
@@ -2521,12 +2592,6 @@ function ClientsPage() {
   useEffect(() => {
     loadAll();
   }, []);
-
-  useEffect(() => {
-    if (editingClientId && clientsViewMode === "create") {
-      scrollToRef(clientEditRef, 10);
-    }
-  }, [editingClientId, clientsViewMode]);
 
   function updateField(key, value) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -2573,7 +2638,7 @@ function ClientsPage() {
     const range = getDateRange(statementType, statementMonth, statementYear);
 
     const clientJobs = jobs.filter((job) => {
-      const d = new Date(job.job_date);
+      const d = parseLocalDate(job.job_date);
       return job.client_id === client.id && d >= range.start && d <= range.end;
     });
 
@@ -2803,7 +2868,7 @@ function ClientsPage() {
   });
 
   return (
-    <div style={pageWrapStyle}>
+    <div style={{ padding: 24 }}>
       <h1 style={pageTitle}>Clients</h1>
 
       <ModeTabs
@@ -2816,8 +2881,8 @@ function ClientsPage() {
       {clientsViewMode === "create" ? (
         <>
           {editingClientId ? (
-            <div ref={clientEditRef} style={{ ...selectedPanelStyle, ...animatedEditAreaStyle }}>
-              <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={selectedPanelStyle}>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Editing Client</div>
                 <div style={selectedPanelTitleStyle}>{form.name || "Selected client"}</div>
                 <div style={mutedTextCompact}>{form.invoice_email || "No invoice email"}</div>
@@ -2965,7 +3030,7 @@ function ClientsPage() {
                 )}
               </div>
 
-              {message ? <div style={messageStyle}>{message}</div> : null}
+              {message ? <div style={{ fontWeight: 700 }}>{message}</div> : null}
             </form>
           </SectionCard>
         </>
@@ -2981,7 +3046,7 @@ function ClientsPage() {
 
           {currentClient ? (
             <div style={selectedPanelStyle}>
-              <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <div style={selectedPanelLabelStyle}>Selected Client</div>
                 <div style={selectedPanelTitleStyle}>{currentClient.name}</div>
                 <div style={mutedTextCompact}>
@@ -3086,7 +3151,7 @@ function ClientsPage() {
                   </div>
                 </ActionMenu>
 
-                {docMessage ? <div style={messageStyle}>{docMessage}</div> : null}
+                {docMessage ? <div style={{ fontWeight: 700 }}>{docMessage}</div> : null}
               </div>
             ) : (
               <div style={mutedText}>No client selected.</div>
@@ -3183,7 +3248,7 @@ function ClientsPage() {
                             setShowInvoiceMenu(false);
                             const range = getDateRange(statementType, statementMonth, statementYear);
                             const clientJobs = jobs.filter((job) => {
-                              const d = new Date(job.job_date);
+                              const d = parseLocalDate(job.job_date);
                               return job.client_id === client.id && d >= range.start && d <= range.end;
                             });
                             setMonthlyInvoicePreview(null);
@@ -3207,7 +3272,7 @@ function ClientsPage() {
                             setShowStatementMenu(false);
                             const range = getDateRange(statementType, statementMonth, statementYear);
                             const clientJobs = jobs.filter((job) => {
-                              const d = new Date(job.job_date);
+                              const d = parseLocalDate(job.job_date);
                               return job.client_id === client.id && d >= range.start && d <= range.end;
                             });
                             setStatementPreview(null);
@@ -3529,11 +3594,11 @@ function DeletedPage() {
   }
 
   return (
-    <div style={subPageWrapStyle}>
+    <div style={{ paddingTop: 10 }}>
       <div style={cardStyle}>
         <div style={sectionTitle}>Deleted</div>
 
-        {message ? <div style={messageStyleWithBottomMargin}>{message}</div> : null}
+        {message ? <div style={{ marginBottom: 12, fontWeight: 700 }}>{message}</div> : null}
         {loading ? <div>Loading deleted items...</div> : null}
 
         <div style={{ display: "grid", gap: 12 }}>
@@ -3818,7 +3883,7 @@ function ClientMonthlyInvoiceDocument({ preview, settings }) {
 }
 
 function ReportDocument({ preview, settings }) {
-  const { scopeLabel, range, totals, dailyMileageTotal, rankings } = preview;
+  const { scopeLabel, range, totals, dailyMileageTotal, rankings, rankLabel } = preview;
   const reportNumber = `RPT-${range.label.replace(/\s+/g, "").replace(/[^A-Za-z0-9-]/g, "")}`;
 
   return (
@@ -3855,15 +3920,20 @@ function ReportDocument({ preview, settings }) {
 
       <div style={documentSection}>
         <div style={documentSectionTitle}>Customer Rankings</div>
+        <div style={mutedText}>
+          Sorted by {rankLabel || "Total $"} high to low.
+        </div>
         {rankings.length === 0 ? (
           <div>No jobs in this report range.</div>
         ) : (
-          <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             {rankings.map((row, idx) => (
               <div key={idx} style={innerCardStyle}>
-                <div style={{ fontWeight: 900 }}>{row.clientName}</div>
+                <div style={{ fontWeight: 900 }}>
+                  {idx + 1}. {row.clientName}
+                </div>
                 <div style={mutedText}>
-                  Service: {money(row.service)} | Hours: {cleanNumber(row.hours)} | Jobs: {row.jobs}
+                  Total: {money(row.total)} | Service: {money(row.service)} | Hours: {cleanNumber(row.hours)} | Jobs: {row.jobs}
                 </div>
                 <div style={mutedText}>
                   $ / Hour: {money(row.valuePerHour)} | $ / Job: {money(row.valuePerJob)}
@@ -3955,7 +4025,7 @@ function OfficePage() {
   const [adminTab, setAdminTab] = useState("settings");
 
   return (
-    <div style={pageWrapStyle}>
+    <div style={{ padding: 24 }}>
       <h1 style={pageTitle}>Office</h1>
 
       <SubTabs
@@ -4001,42 +4071,21 @@ function OfficePage() {
   );
 }
 
-const animatedEditAreaStyle = {
-  animation: "slideFadeIn 220ms ease-out",
-};
-
-const messageStyle = {
-  fontWeight: 700,
-  animation: "successPop 220ms ease-out",
-};
-
-const messageStyleWithMargin = {
-  marginTop: 14,
-  fontWeight: 700,
-  animation: "successPop 220ms ease-out",
-};
-
-const messageStyleWithBottomMargin = {
-  marginBottom: 12,
-  fontWeight: 700,
-  animation: "successPop 220ms ease-out",
-};
-
 const pageTitle = {
-  fontSize: IS_SMALL_PHONE ? 26 : IS_PHONE ? 28 : 32,
-  marginBottom: IS_PHONE ? 10 : 12,
+  fontSize: IS_SMALL_PHONE ? 26 : 32,
+  marginBottom: 12,
   lineHeight: 1.1,
 };
 
 const sectionTitle = {
-  fontSize: IS_SMALL_PHONE ? 20 : IS_PHONE ? 22 : 24,
+  fontSize: IS_SMALL_PHONE ? 20 : 24,
   fontWeight: 900,
-  marginBottom: IS_PHONE ? 10 : 12,
+  marginBottom: 12,
   lineHeight: 1.15,
 };
 
 const itemTitle = {
-  fontSize: IS_SMALL_PHONE ? 21 : IS_PHONE ? 24 : 28,
+  fontSize: IS_SMALL_PHONE ? 22 : 28,
   fontWeight: 900,
   lineHeight: 1.15,
   wordBreak: "break-word",
@@ -4045,21 +4094,26 @@ const itemTitle = {
 const mutedText = {
   color: "#6c6760",
   marginTop: 6,
+  fontSize: IS_SMALL_PHONE ? 14 : 16,
+  lineHeight: 1.35,
+  wordBreak: "break-word",
 };
 
 const mutedTextCompact = {
   color: "#6c6760",
   marginTop: 4,
-  fontSize: IS_PHONE ? 13 : 14,
-  lineHeight: 1.35,
+  fontSize: IS_SMALL_PHONE ? 13 : 14,
+  lineHeight: 1.3,
+  wordBreak: "break-word",
 };
 
 const inputStyle = {
   width: "100%",
-  padding: IS_SMALL_PHONE ? "10px 12px" : IS_PHONE ? "11px 13px" : "12px 14px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 14px",
   borderRadius: 12,
   border: "2px solid #d0ccc4",
-  fontSize: IS_PHONE ? 15 : 16,
+  fontSize: IS_SMALL_PHONE ? 14 : 16,
+  lineHeight: 1.25,
   boxSizing: "border-box",
   background: "#fff",
   color: "#1e1b18",
@@ -4068,87 +4122,82 @@ const inputStyle = {
 };
 
 const buttonStyle = {
-  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
-  padding: IS_SMALL_PHONE ? "11px 12px" : IS_PHONE ? "12px 14px" : "14px 18px",
+  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_PHONE ? 15 : 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  lineHeight: 1.15,
 };
 
 const secondaryButtonStyle = {
-  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
-  padding: IS_SMALL_PHONE ? "11px 12px" : IS_PHONE ? "12px 14px" : "14px 18px",
+  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #1e1b18",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  lineHeight: 1.15,
 };
 
 const dangerButtonStyle = {
-  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
-  padding: IS_SMALL_PHONE ? "11px 12px" : IS_PHONE ? "12px 14px" : "14px 18px",
+  padding: IS_SMALL_PHONE ? "12px 14px" : "14px 18px",
   borderRadius: 12,
   border: "2px solid #8b1e1e",
   background: "#8b1e1e",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
+  lineHeight: 1.15,
 };
 
 const miniButtonStyle = {
-  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
-  padding: IS_PHONE ? "8px 10px" : "10px 14px",
+  padding: IS_SMALL_PHONE ? "8px 10px" : "10px 14px",
   borderRadius: 10,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: IS_PHONE ? 12 : 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const secondaryMiniButtonStyle = {
-  transition: "transform 140ms ease, box-shadow 140ms ease, background 140ms ease",
-  padding: IS_PHONE ? "8px 10px" : "10px 14px",
+  padding: IS_SMALL_PHONE ? "8px 10px" : "10px 14px",
   borderRadius: 10,
   border: "2px solid #1e1b18",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const cardStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 18,
-  marginBottom: IS_PHONE ? 14 : 20,
+  padding: IS_SMALL_PHONE ? 14 : 18,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
 };
 
 const formCardStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 20,
-  marginBottom: IS_PHONE ? 14 : 20,
+  padding: IS_SMALL_PHONE ? 14 : 20,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
   display: "grid",
-  gap: IS_PHONE ? 10 : 12,
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const sectionCardStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 16,
-  marginBottom: IS_PHONE ? 14 : 18,
+  padding: IS_SMALL_PHONE ? 12 : 16,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const sectionHeaderButtonStyle = {
@@ -4156,8 +4205,7 @@ const sectionHeaderButtonStyle = {
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-  gap: IS_PHONE ? 8 : 12,
-  flexWrap: "wrap",
+  gap: 12,
   border: "none",
   background: "transparent",
   padding: 0,
@@ -4177,25 +4225,25 @@ const sectionChevronStyle = {
 };
 
 const pillStyle = {
-  padding: IS_PHONE ? "5px 8px" : "6px 10px",
+  padding: IS_SMALL_PHONE ? "5px 8px" : "6px 10px",
   borderRadius: 999,
   background: "#f4f0e8",
   border: "2px solid #d0ccc4",
   fontWeight: 800,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const compactFormStyle = {
   display: "grid",
-  gap: IS_PHONE ? 10 : 12,
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const innerCardStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#f8f5ef",
   border: "2px solid #d0ccc4",
   borderRadius: 14,
-  padding: IS_PHONE ? 11 : 14,
+  padding: IS_SMALL_PHONE ? 12 : 14,
+  overflowWrap: "anywhere",
 };
 
 const menuWrapStyle = {
@@ -4209,7 +4257,7 @@ const menuMainButtonStyle = {
   width: "100%",
   border: "none",
   background: "transparent",
-  padding: IS_PHONE ? 12 : 16,
+  padding: 16,
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
@@ -4219,8 +4267,9 @@ const menuMainButtonStyle = {
 };
 
 const menuTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 18 : IS_PHONE ? 20 : 22,
+  fontSize: IS_SMALL_PHONE ? 18 : 22,
   fontWeight: 900,
+  lineHeight: 1.15,
 };
 
 const menuChevronStyle = {
@@ -4236,65 +4285,68 @@ const menuChevronStyle = {
 
 const menuBodyStyle = {
   borderTop: "2px solid #d0ccc4",
-  padding: IS_PHONE ? 11 : 14,
+  padding: 14,
 };
 
 const modeTabsWrapStyle = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
-  gap: IS_PHONE ? 8 : 10,
-  marginBottom: 18,
+  gap: IS_SMALL_PHONE ? 8 : 10,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const modeTabStyle = {
-  padding: IS_PHONE ? "11px 12px" : "14px 18px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 18px",
   borderRadius: 14,
   border: "2px solid #d0ccc4",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 14 : 18,
+  lineHeight: 1.15,
 };
 
 const modeTabActiveStyle = {
-  padding: IS_PHONE ? "11px 12px" : "14px 18px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 18px",
   borderRadius: 14,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 18,
+  fontSize: IS_SMALL_PHONE ? 14 : 18,
+  lineHeight: 1.15,
 };
 
 const subTabsWrapStyle = {
   display: "grid",
   gridTemplateColumns: IS_SMALL_PHONE ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))",
-  gap: IS_PHONE ? 8 : 10,
-  marginBottom: 18,
+  gap: IS_SMALL_PHONE ? 8 : 10,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const subTabStyle = {
-  padding: IS_PHONE ? "10px 12px" : "12px 16px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 16px",
   borderRadius: 14,
   border: "2px solid #d0ccc4",
   background: "#fff",
   color: "#1e1b18",
   fontWeight: 800,
-  fontSize: 16,
+  fontSize: IS_SMALL_PHONE ? 13 : 16,
+  lineHeight: 1.15,
 };
 
 const subTabActiveStyle = {
-  padding: IS_PHONE ? "10px 12px" : "12px 16px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "12px 16px",
   borderRadius: 14,
   border: "2px solid #1e1b18",
   background: "#1e1b18",
   color: "#fff",
   fontWeight: 800,
-  fontSize: 16,
+  fontSize: IS_SMALL_PHONE ? 13 : 16,
+  lineHeight: 1.15,
 };
 
 const simpleCardStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   border: "2px solid #d0ccc4",
   borderRadius: 16,
   overflow: "hidden",
@@ -4304,7 +4356,7 @@ const simpleCardButtonStyle = {
   width: "100%",
   border: "none",
   background: "transparent",
-  padding: IS_PHONE ? 11 : 14,
+  padding: 14,
   textAlign: "left",
   cursor: "pointer",
 };
@@ -4312,58 +4364,58 @@ const simpleCardButtonStyle = {
 const simpleCardMainRowStyle = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 8,
+  gap: 12,
   alignItems: "center",
-  flexWrap: "wrap",
 };
 
 const simpleCardSubRowStyle = {
   display: "flex",
   justifyContent: "space-between",
   gap: 8,
-  flexWrap: "wrap",
   color: "#6c6760",
   marginTop: 8,
-  fontSize: 14,
+  fontSize: IS_SMALL_PHONE ? 12 : 14,
+  flexWrap: "wrap",
+  lineHeight: 1.25,
 };
 
 const simpleCardTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 17 : IS_PHONE ? 19 : 22,
+  fontSize: IS_SMALL_PHONE ? 18 : 22,
   fontWeight: 900,
   lineHeight: 1.15,
   wordBreak: "break-word",
 };
 
 const simpleCardAmountStyle = {
-  fontSize: IS_PHONE ? 15 : 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
   fontWeight: 900,
+  flexShrink: 0,
 };
 
 const simpleCardActionsStyle = {
   borderTop: "2px solid #d0ccc4",
-  padding: IS_PHONE ? 10 : 12,
+  padding: IS_SMALL_PHONE ? 10 : 12,
   display: "flex",
-  gap: 10,
+  gap: 8,
   flexWrap: "wrap",
   alignItems: "center",
 };
 
 const selectedPanelStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#f6f1e8",
   border: "2px solid #1e1b18",
   borderRadius: 18,
-  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 16,
-  marginBottom: IS_PHONE ? 14 : 18,
+  padding: IS_SMALL_PHONE ? 12 : 16,
+  marginBottom: IS_SMALL_PHONE ? 14 : 18,
   display: "flex",
   justifyContent: "space-between",
   gap: 10,
-  alignItems: "center",
+  alignItems: "flex-start",
   flexWrap: "wrap",
 };
 
 const selectedPanelLabelStyle = {
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 800,
   color: "#6c6760",
   textTransform: "uppercase",
@@ -4371,7 +4423,7 @@ const selectedPanelLabelStyle = {
 };
 
 const selectedPanelTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 18 : IS_PHONE ? 20 : 24,
+  fontSize: IS_SMALL_PHONE ? 18 : 24,
   fontWeight: 900,
   marginTop: 4,
   lineHeight: 1.15,
@@ -4381,27 +4433,27 @@ const selectedPanelTitleStyle = {
 
 const grid2 = {
   display: "grid",
-  gridTemplateColumns: IS_PHONE ? "1fr" : "1fr 1fr",
-  gap: IS_PHONE ? 10 : 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : "1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const grid3 = {
   display: "grid",
-  gridTemplateColumns: IS_PHONE ? "1fr" : "1fr 1fr 1fr",
-  gap: IS_PHONE ? 10 : 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : IS_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const previewGrid = {
   display: "grid",
-  gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : IS_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
-  gap: IS_PHONE ? 10 : 12,
+  gridTemplateColumns: IS_SMALL_PHONE ? "1fr 1fr" : "1fr 1fr 1fr",
+  gap: IS_SMALL_PHONE ? 10 : 12,
 };
 
 const previewCard = {
   background: "#f7f4ee",
   border: "2px solid #d0ccc4",
   borderRadius: 14,
-  padding: IS_PHONE ? 10 : 14,
+  padding: IS_SMALL_PHONE ? 12 : 14,
 };
 
 const previewLabel = {
@@ -4412,42 +4464,44 @@ const previewLabel = {
 };
 
 const previewValue = {
-  fontSize: IS_SMALL_PHONE ? 18 : IS_PHONE ? 20 : 22,
+  fontSize: IS_SMALL_PHONE ? 18 : 22,
   fontWeight: 900,
+  lineHeight: 1.15,
 };
 
 const statsGrid = {
   display: "grid",
   gridTemplateColumns: IS_SMALL_PHONE ? "1fr" : "1fr 1fr",
-  gap: IS_PHONE ? 10 : 14,
-  marginBottom: 20,
+  gap: IS_SMALL_PHONE ? 10 : 14,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
 };
 
 const statCardStyle = {
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease",
   background: "#fff",
   border: "2px solid #d0ccc4",
   borderRadius: 18,
-  padding: IS_PHONE ? 12 : 18,
+  padding: IS_SMALL_PHONE ? 14 : 18,
 };
 
 const statLabelStyle = {
-  fontSize: IS_PHONE ? 14 : 18,
+  fontSize: IS_SMALL_PHONE ? 15 : 18,
   color: "#6c6760",
   fontWeight: 800,
-  marginBottom: 12,
+  marginBottom: 10,
+  lineHeight: 1.2,
 };
 
 const statValueStyle = {
-  fontSize: IS_SMALL_PHONE ? 22 : IS_PHONE ? 26 : 32,
+  fontSize: IS_SMALL_PHONE ? 26 : 32,
   fontWeight: 900,
+  lineHeight: 1.1,
 };
 
 const betweenRow = {
   display: "flex",
   justifyContent: "space-between",
-  gap: 10,
-  alignItems: "center",
+  gap: 12,
+  alignItems: IS_SMALL_PHONE ? "flex-start" : "center",
   marginBottom: 16,
   flexWrap: "wrap",
 };
@@ -4455,10 +4509,10 @@ const betweenRow = {
 const documentPaperStyle = {
   background: "#fffdf9",
   border: "2px solid #d0ccc4",
-  borderRadius: 16,
-  padding: IS_SMALL_PHONE ? 10 : IS_PHONE ? 12 : 20,
+  borderRadius: IS_SMALL_PHONE ? 12 : 16,
+  padding: IS_SMALL_PHONE ? 12 : 20,
   width: "100%",
-  maxWidth: "100%",
+  boxSizing: "border-box",
   overflowX: "hidden",
 };
 
@@ -4466,28 +4520,31 @@ const documentHeaderRow = {
   display: "flex",
   justifyContent: "space-between",
   gap: 12,
-  marginBottom: IS_PHONE ? 14 : 20,
-  flexWrap: "wrap",
+  marginBottom: 16,
+  flexDirection: IS_SMALL_PHONE ? "column" : "row",
+  alignItems: IS_SMALL_PHONE ? "flex-start" : "stretch",
 };
 
 const documentBusinessNameStyle = {
-  fontSize: IS_SMALL_PHONE ? 20 : IS_PHONE ? 22 : 28,
+  fontSize: IS_SMALL_PHONE ? 22 : 28,
   fontWeight: 900,
   marginBottom: 8,
+  lineHeight: 1.1,
 };
 
 const documentTitleStyle = {
-  fontSize: IS_SMALL_PHONE ? 22 : IS_PHONE ? 24 : 30,
+  fontSize: IS_SMALL_PHONE ? 24 : 30,
   fontWeight: 900,
   marginBottom: 8,
+  lineHeight: 1.1,
 };
 
 const documentSection = {
-  marginBottom: IS_PHONE ? 14 : 20,
+  marginBottom: IS_SMALL_PHONE ? 14 : 20,
 };
 
 const documentSectionTitle = {
-  fontSize: IS_PHONE ? 16 : 18,
+  fontSize: IS_SMALL_PHONE ? 16 : 18,
   fontWeight: 900,
   marginBottom: 8,
 };
@@ -4495,9 +4552,10 @@ const documentSectionTitle = {
 const documentTableStyle = {
   display: "grid",
   gridTemplateColumns: "1fr auto",
-  gap: 10,
+  gap: IS_SMALL_PHONE ? 8 : 10,
   borderTop: "2px solid #d0ccc4",
-  paddingTop: 14,
+  paddingTop: 12,
+  fontSize: IS_SMALL_PHONE ? 14 : 16,
 };
 
 const documentTableHeaderStyle = {
@@ -4507,11 +4565,13 @@ const documentTableHeaderStyle = {
 
 const documentTableCellStyle = {
   padding: "4px 0",
+  wordBreak: "break-word",
 };
 
 const documentTableCellRightStyle = {
   padding: "4px 0",
   textAlign: "right",
+  whiteSpace: "nowrap",
 };
 
 const documentFooterStyle = {
@@ -4526,7 +4586,7 @@ const printOverlayStyle = {
   zIndex: 9999,
   background: "#f4f0e8",
   overflow: "auto",
-  padding: IS_PHONE ? 8 : 18,
+  padding: IS_SMALL_PHONE ? 8 : 18,
 };
 
 const printToolbarStyle = {
@@ -4535,43 +4595,30 @@ const printToolbarStyle = {
   zIndex: 2,
   display: "flex",
   justifyContent: "space-between",
-  alignItems: "center",
+  alignItems: IS_SMALL_PHONE ? "flex-start" : "center",
   gap: 10,
   flexWrap: "wrap",
-  padding: IS_PHONE ? "10px 12px" : "14px 16px",
+  padding: IS_SMALL_PHONE ? "10px 12px" : "14px 16px",
   background: "#f4f0e8",
   border: "2px solid #d0ccc4",
   borderRadius: 16,
-  marginBottom: 16,
+  marginBottom: 12,
 };
 
 const printPaperWrapStyle = {
+  maxWidth: 980,
   width: "100%",
-  maxWidth: IS_PHONE ? 420 : 980,
   margin: "0 auto",
-};
-
-const pageWrapStyle = {
-  padding: IS_SMALL_PHONE ? 12 : IS_PHONE ? 14 : 24,
-};
-
-const subPageWrapStyle = {
-  paddingTop: IS_PHONE ? 6 : 10,
+  boxSizing: "border-box",
 };
 
 function Layout() {
-  const location = useLocation();
-
-  useEffect(() => {
-    scrollToTop();
-  }, [location.pathname]);
-
   const screenWidth = typeof window !== "undefined" ? window.innerWidth : 390;
-  const isPhoneScreen = screenWidth <= 560;
+  const isPhoneScreen = screenWidth <= 520;
   const isVeryNarrowPhone = screenWidth <= 420;
 
   const navStyle = ({ isActive }) => ({
-    padding: isVeryNarrowPhone ? "5px 1px" : isPhoneScreen ? "6px 2px" : "8px 6px",
+    padding: isVeryNarrowPhone ? "6px 1px" : isPhoneScreen ? "7px 2px" : "8px 6px",
     borderRadius: isVeryNarrowPhone ? 8 : isPhoneScreen ? 10 : 12,
     textDecoration: "none",
     color: isActive ? "#fff" : "#1e1b18",
@@ -4579,7 +4626,7 @@ function Layout() {
     border: isVeryNarrowPhone ? "1px solid #d0ccc4" : "2px solid #d0ccc4",
     textAlign: "center",
     minWidth: 0,
-    minHeight: isVeryNarrowPhone ? 30 : isPhoneScreen ? 34 : 42,
+    minHeight: isVeryNarrowPhone ? 32 : isPhoneScreen ? 36 : 42,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -4592,13 +4639,13 @@ function Layout() {
         minHeight: "100vh",
         background: "#f4f0e8",
         color: "#1e1b18",
-        paddingBottom: isVeryNarrowPhone ? 50 : isPhoneScreen ? 56 : 72,
+        paddingBottom: isVeryNarrowPhone ? 52 : isPhoneScreen ? 58 : 72,
       }}
     >
       <div style={{ padding: isPhoneScreen ? 16 : 20 }}>
         <h1
           style={{
-            fontSize: isVeryNarrowPhone ? 24 : isPhoneScreen ? 26 : 32,
+            fontSize: isVeryNarrowPhone ? 26 : isPhoneScreen ? 28 : 32,
             margin: 0,
             fontWeight: 900,
             color: "#1e1b18",
@@ -4608,7 +4655,7 @@ function Layout() {
         </h1>
         <p
           style={{
-            fontSize: isVeryNarrowPhone ? 13 : isPhoneScreen ? 14 : 18,
+            fontSize: isVeryNarrowPhone ? 14 : isPhoneScreen ? 15 : 18,
             color: "#4f4a45",
             marginTop: 8,
           }}
@@ -4617,15 +4664,13 @@ function Layout() {
         </p>
       </div>
 
-      <div key={location.pathname} className="page-transition">
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/jobs" element={<JobsPage />} />
-          <Route path="/clients" element={<ClientsPage />} />
-          <Route path="/mileage" element={<MileagePage />} />
-          <Route path="/office" element={<OfficePage />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<DashboardPage />} />
+        <Route path="/jobs" element={<JobsPage />} />
+        <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/mileage" element={<MileagePage />} />
+        <Route path="/office" element={<OfficePage />} />
+      </Routes>
 
       <nav
         style={{
@@ -4635,8 +4680,8 @@ function Layout() {
           bottom: 0,
           display: "grid",
           gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
-          gap: isVeryNarrowPhone ? 1 : isPhoneScreen ? 1.5 : 4,
-          padding: isVeryNarrowPhone ? 2 : isPhoneScreen ? 3 : 6,
+          gap: isVeryNarrowPhone ? 1 : isPhoneScreen ? 2 : 4,
+          padding: isVeryNarrowPhone ? 3 : isPhoneScreen ? 4 : 6,
           background: "#f4f0e8",
           borderTop: "1px solid #d0ccc4",
           boxSizing: "border-box",
